@@ -16,7 +16,7 @@ model Application {
   answers         Answer[]
   denialReason    String?
   revisionReason  String?  // Reason for requesting revision
-  revisionQuestionIds String[] // Question IDs that need revision
+  revisionQuestionIds Json     @default("[]") // Question IDs that need revision
   reviewedBy      String?  // Discord username of reviewer
   reviewedById    String?  // Discord ID of reviewer
   reviewedAt      DateTime?
