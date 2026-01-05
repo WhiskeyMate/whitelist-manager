@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Application {
+  id            String   @id @default(cuid())
+  discordId     String
+  discordName   String
+  discordAvatar String?
+  status        String   @default("pending") // pending, approved, denied
+  answers       Answer[]
+  denialReason  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Answer {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      Question    @relation(fields: [questionId], references: [id])
+  textAnswer    String?
+  audioUrl      String?
+  createdAt     DateTime    @default(now())
+}
+
+model Question {
+  id          String   @id @default(cuid())
+  text        String
+  type        String   // text, textarea, audio
+  required    Boolean  @default(true)
+  order       Int      @default(0)
+  answers     Answer[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
