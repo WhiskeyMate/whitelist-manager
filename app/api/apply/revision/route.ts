@@ -85,12 +85,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Update application status back to pending
+    // Update application status back to pending, store which questions were revised
     const updatedApp = await prisma.application.update({
       where: { id: application.id },
       data: {
         status: 'pending',
         revisionReason: null,
+        revisedQuestionIds: revisionQuestionIds, // Store for highlighting in admin
         revisionQuestionIds: [],
         reviewedBy: null,
         reviewedById: null,

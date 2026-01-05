@@ -14,6 +14,7 @@ interface Application {
   denialReason: string | null
   revisionReason: string | null
   revisionQuestionIds: string[]
+  revisedQuestionIds: string[]
   reviewedBy: string | null
   reviewedById: string | null
   reviewedAt: string | null
@@ -617,14 +618,16 @@ export default function AdminPage() {
 
                   <div className="space-y-6">
                     {selectedApp.answers.map(answer => {
-                      const needsRevision = selectedApp.revisionQuestionIds?.includes(answer.question.id)
+                      const needsRevision = (selectedApp.revisionQuestionIds || []).includes(answer.question.id)
+                      const wasRevised = (selectedApp.revisedQuestionIds || []).includes(answer.question.id)
                       const isSelectedForRevision = revisionQuestionIds.includes(answer.question.id)
+                      const shouldHighlight = needsRevision || wasRevised
 
                       return (
                         <div
                           key={answer.id}
                           className={`border-b border-[#8b7355]/20 pb-4 last:border-0 ${
-                            needsRevision ? 'bg-amber-900/10 -mx-4 px-4 py-2 rounded border border-amber-800/30' : ''
+                            shouldHighlight ? 'bg-amber-900/10 -mx-4 px-4 py-2 rounded border border-amber-800/30' : ''
                           }`}
                         >
                           <div className="flex items-start gap-3">
@@ -640,11 +643,16 @@ export default function AdminPage() {
                               </label>
                             )}
                             <div className="flex-1">
-                              <p className={`font-medium mb-2 ${needsRevision ? 'text-amber-500' : 'text-[#c4a574]'}`}>
+                              <p className={`font-medium mb-2 ${shouldHighlight ? 'text-amber-500' : 'text-[#c4a574]'}`}>
                                 {answer.question.text}
                                 {needsRevision && (
                                   <span className="ml-2 text-xs bg-amber-700 text-white px-2 py-0.5 rounded">
                                     Needs Revision
+                                  </span>
+                                )}
+                                {wasRevised && !needsRevision && (
+                                  <span className="ml-2 text-xs bg-amber-600 text-white px-2 py-0.5 rounded">
+                                    Revised
                                   </span>
                                 )}
                               </p>

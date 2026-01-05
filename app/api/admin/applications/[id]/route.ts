@@ -45,14 +45,17 @@ export async function PUT(
       updateData.denialReason = denialReason
       updateData.revisionReason = null
       updateData.revisionQuestionIds = []
+      updateData.revisedQuestionIds = []
     } else if (status === 'revision') {
       updateData.revisionReason = revisionReason
       updateData.revisionQuestionIds = revisionQuestionIds || []
+      updateData.revisedQuestionIds = []
       updateData.denialReason = null
     } else if (status === 'approved') {
       updateData.denialReason = null
       updateData.revisionReason = null
       updateData.revisionQuestionIds = []
+      updateData.revisedQuestionIds = []
     }
 
     // Update application with reviewer info
