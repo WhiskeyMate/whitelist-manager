@@ -161,14 +161,35 @@ export default function AdminPage() {
   }
 
   async function handleDeleteQuestion(id: string) {
-    if (!confirm('Delete this question?')) return
+    if (!confirm('Delete this question? This will also delete all answers to this question.')) return
     try {
       const res = await fetch(`/api/admin/questions/${id}`, { method: 'DELETE' })
       if (res.ok) {
         setQuestions(prev => prev.filter(q => q.id !== id))
+      } else {
+        const data = await res.json()
+        alert(`Error: ${data.error || 'Failed to delete question'}`)
       }
     } catch (e) {
       console.error('Failed to delete question:', e)
+      alert('Failed to delete question')
+    }
+  }
+
+  async function handleDeleteApplication(id: string) {
+    if (!confirm('Delete this application? This will allow the user to re-apply.')) return
+    try {
+      const res = await fetch(`/api/admin/applications/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setApplications(prev => prev.filter(a => a.id !== id))
+        setSelectedApp(null)
+      } else {
+        const data = await res.json()
+        alert(`Error: ${data.error || 'Failed to delete application'}`)
+      }
+    } catch (e) {
+      console.error('Failed to delete application:', e)
+      alert('Failed to delete application')
     }
   }
 
@@ -314,24 +335,34 @@ export default function AdminPage() {
                         <p className="text-sm text-zinc-500">ID: {selectedApp.discordId}</p>
                       </div>
                     </div>
-                    {selectedApp.status === 'pending' && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleApprove(selectedApp.id)}
-                          disabled={processing}
-                          className="btn btn-success"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => setShowDenialModal(true)}
-                          disabled={processing}
-                          className="btn btn-danger"
-                        >
-                          Deny
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex gap-2">
+                      {selectedApp.status === 'pending' && (
+                        <>
+                          <button
+                            onClick={() => handleApprove(selectedApp.id)}
+                            disabled={processing}
+                            className="btn btn-success"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => setShowDenialModal(true)}
+                            disabled={processing}
+                            className="btn btn-danger"
+                          >
+                            Deny
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => handleDeleteApplication(selectedApp.id)}
+                        disabled={processing}
+                        className="btn bg-zinc-700 hover:bg-zinc-600 text-sm"
+                        title="Delete application to allow re-apply"
+                      >
+                        Reset
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-6">

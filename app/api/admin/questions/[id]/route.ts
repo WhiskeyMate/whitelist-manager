@@ -39,6 +39,11 @@ export async function DELETE(
   }
 
   try {
+    // Delete related answers first
+    await prisma.answer.deleteMany({
+      where: { questionId: params.id },
+    })
+
     await prisma.question.delete({
       where: { id: params.id },
     })

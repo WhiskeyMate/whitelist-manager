@@ -67,3 +67,26 @@ export async function PUT(
     return NextResponse.json({ error: 'Failed to update application' }, { status: 500 })
   }
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const session = await getServerSession(authOptions)
+
+  if (!session?.user?.isAdmin) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    // Application has cascade delete for answers in schema, so just delete
+    await prisma.application.delete({
+      where: { id: params.id },
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Failed to delete application:', error)
+    return NextResponse.json({ error: 'Failed to delete application' }, { status: 500 })
+  }
+}
