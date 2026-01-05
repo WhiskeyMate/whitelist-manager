@@ -97,3 +97,23 @@ export async function sendEmbedDM(userId: string, embed: object): Promise<boolea
     return false
   }
 }
+
+export async function sendWebhook(webhookUrl: string, embed: object): Promise<boolean> {
+  try {
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ embeds: [embed] }),
+    })
+
+    if (!res.ok) {
+      console.error('Webhook error:', res.status, await res.text())
+      return false
+    }
+
+    return true
+  } catch (e) {
+    console.error('Failed to send webhook:', e)
+    return false
+  }
+}

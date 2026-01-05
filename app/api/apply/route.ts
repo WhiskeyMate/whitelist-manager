@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { uploadAudio } from '@/lib/cloudinary'
+import { sendWebhook } from '@/lib/discord'
+
+const STAFF_WEBHOOK_URL = process.env.STAFF_WEBHOOK_URL
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -75,6 +78,37 @@ export async function POST(req: NextRequest) {
         },
       },
     })
+
+    // Send webhook notification to staff
+    if (STAFF_WEBHOOK_URL) {
+      const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
+      const appUrl = process.env.NEXTAUTH_URL || 'https://whitelist.rosalitarp.com'
+
+      await sendWebhook(STAFF_WEBHOOK_URL, {
+        title: 'New Whitelist Application',
+        description: `**${session.user.name}** has submitted a whitelist application.`,
+        color: 0xc4a574, // Western gold color
+        thumbnail: {
+          url: session.user.image || `https://cdn.discordapp.com/embed/avatars/0.png`,
+        },
+        fields: [
+          {
+            name: 'Discord ID',
+            value: session.user.id,
+            inline: true,
+          },
+          {
+            name: 'Questions Answered',
+            value: String(completeApp?.answers.length || 0),
+            inline: true,
+          },
+        ],
+        footer: {
+          text: serverName,
+        },
+        timestamp: new Date().toISOString(),
+      })
+    }
 
     return NextResponse.json({ application: completeApp })
   } catch (error) {
