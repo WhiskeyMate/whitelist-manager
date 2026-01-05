@@ -38,7 +38,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Update answers for the revision questions
-    for (const questionId of application.revisionQuestionIds) {
+    const revisionQuestionIds = application.revisionQuestionIds as string[]
+    for (const questionId of revisionQuestionIds) {
       // Check if there's a text answer
       if (textAnswers[questionId]) {
         await prisma.answer.updateMany({
