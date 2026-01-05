@@ -48,6 +48,8 @@ export default function AdminPage() {
   const [newQuestion, setNewQuestion] = useState({ text: '', type: 'text', required: true })
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
 
+  const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/')
@@ -196,7 +198,7 @@ export default function AdminPage() {
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#c4a574]"></div>
       </div>
     )
   }
@@ -211,12 +213,21 @@ export default function AdminPage() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-            <p className="text-zinc-400">Manage whitelist applications</p>
+          <div className="flex items-center gap-4">
+            <Image
+              src="/logo.png"
+              alt={serverName}
+              width={60}
+              height={60}
+              className="opacity-90"
+            />
+            <div>
+              <h1 className="text-2xl">Admin Dashboard</h1>
+              <p className="text-[#8b7355]">Manage whitelist applications</p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-zinc-400">{session.user.name}</span>
+            <span className="text-[#8b7355]">{session.user.name}</span>
             <button onClick={() => signOut()} className="btn btn-primary text-sm">
               Sign Out
             </button>
@@ -227,16 +238,20 @@ export default function AdminPage() {
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => setTab('applications')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              tab === 'applications' ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+            className={`px-4 py-2 rounded font-medium transition-colors ${
+              tab === 'applications'
+                ? 'bg-[#c4a574] text-[#1a1410]'
+                : 'bg-[#2d261f] text-[#8b7355] hover:text-[#c4a574] border border-[#8b7355]/30'
             }`}
           >
             Applications ({pendingApps.length} pending)
           </button>
           <button
             onClick={() => setTab('questions')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              tab === 'questions' ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+            className={`px-4 py-2 rounded font-medium transition-colors ${
+              tab === 'questions'
+                ? 'bg-[#c4a574] text-[#1a1410]'
+                : 'bg-[#2d261f] text-[#8b7355] hover:text-[#c4a574] border border-[#8b7355]/30'
             }`}
           >
             Questions ({questions.length})
@@ -248,16 +263,16 @@ export default function AdminPage() {
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Applications List */}
             <div className="lg:col-span-1 space-y-4">
-              <h2 className="font-semibold text-zinc-400 uppercase text-sm">Pending</h2>
+              <h2 className="font-['Special_Elite'] text-[#c4a574] uppercase tracking-wider text-sm">Pending</h2>
               {pendingApps.length === 0 ? (
-                <p className="text-zinc-500 text-sm">No pending applications</p>
+                <p className="text-[#6b5a45] text-sm">No pending applications</p>
               ) : (
                 pendingApps.map(app => (
                   <div
                     key={app.id}
                     onClick={() => setSelectedApp(app)}
-                    className={`card cursor-pointer hover:border-indigo-500 transition-colors ${
-                      selectedApp?.id === app.id ? 'border-indigo-500' : ''
+                    className={`card cursor-pointer hover:border-[#c4a574] transition-colors ${
+                      selectedApp?.id === app.id ? 'border-[#c4a574]' : ''
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -267,16 +282,16 @@ export default function AdminPage() {
                           alt=""
                           width={40}
                           height={40}
-                          className="rounded-full"
+                          className="rounded-full border-2 border-[#8b7355]"
                         />
                       ) : (
-                        <div className="w-10 h-10 bg-zinc-700 rounded-full flex items-center justify-center">
+                        <div className="w-10 h-10 bg-[#2d261f] rounded-full flex items-center justify-center border-2 border-[#8b7355] text-[#c4a574]">
                           {app.discordName[0]}
                         </div>
                       )}
                       <div>
-                        <p className="font-medium">{app.discordName}</p>
-                        <p className="text-sm text-zinc-500">
+                        <p className="font-medium text-[#d4c4a8]">{app.discordName}</p>
+                        <p className="text-sm text-[#6b5a45]">
                           {new Date(app.createdAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -285,21 +300,21 @@ export default function AdminPage() {
                 ))
               )}
 
-              <h2 className="font-semibold text-zinc-400 uppercase text-sm mt-8">Processed</h2>
+              <h2 className="font-['Special_Elite'] text-[#c4a574] uppercase tracking-wider text-sm mt-8">Processed</h2>
               {processedApps.slice(0, 10).map(app => (
                 <div
                   key={app.id}
                   onClick={() => setSelectedApp(app)}
                   className={`card cursor-pointer opacity-60 hover:opacity-100 transition-opacity ${
-                    selectedApp?.id === app.id ? 'border-indigo-500 opacity-100' : ''
+                    selectedApp?.id === app.id ? 'border-[#c4a574] opacity-100' : ''
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-zinc-700 rounded-full flex items-center justify-center">
+                    <div className="w-10 h-10 bg-[#2d261f] rounded-full flex items-center justify-center border-2 border-[#8b7355] text-[#c4a574]">
                       {app.discordName[0]}
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium">{app.discordName}</p>
+                      <p className="font-medium text-[#d4c4a8]">{app.discordName}</p>
                       <p className={`text-sm capitalize ${
                         app.status === 'approved' ? 'text-green-500' : 'text-red-500'
                       }`}>
@@ -315,7 +330,7 @@ export default function AdminPage() {
             <div className="lg:col-span-2">
               {selectedApp ? (
                 <div className="card">
-                  <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center justify-between mb-6 pb-6 border-b border-[#8b7355]/30">
                     <div className="flex items-center gap-3">
                       {selectedApp.discordAvatar ? (
                         <Image
@@ -323,16 +338,16 @@ export default function AdminPage() {
                           alt=""
                           width={48}
                           height={48}
-                          className="rounded-full"
+                          className="rounded-full border-2 border-[#8b7355]"
                         />
                       ) : (
-                        <div className="w-12 h-12 bg-zinc-700 rounded-full flex items-center justify-center text-lg">
+                        <div className="w-12 h-12 bg-[#2d261f] rounded-full flex items-center justify-center text-lg border-2 border-[#8b7355] text-[#c4a574]">
                           {selectedApp.discordName[0]}
                         </div>
                       )}
                       <div>
-                        <p className="font-semibold text-lg">{selectedApp.discordName}</p>
-                        <p className="text-sm text-zinc-500">ID: {selectedApp.discordId}</p>
+                        <p className="font-semibold text-lg text-[#d4c4a8]">{selectedApp.discordName}</p>
+                        <p className="text-sm text-[#6b5a45]">ID: {selectedApp.discordId}</p>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -357,7 +372,7 @@ export default function AdminPage() {
                       <button
                         onClick={() => handleDeleteApplication(selectedApp.id)}
                         disabled={processing}
-                        className="btn bg-zinc-700 hover:bg-zinc-600 text-sm"
+                        className="btn bg-[#2d261f] hover:bg-[#3d3529] border-[#8b7355] text-[#d4c4a8] text-sm"
                         title="Delete application to allow re-apply"
                       >
                         Reset
@@ -367,20 +382,20 @@ export default function AdminPage() {
 
                   <div className="space-y-6">
                     {selectedApp.answers.map(answer => (
-                      <div key={answer.id}>
-                        <p className="font-medium text-zinc-300 mb-2">{answer.question.text}</p>
+                      <div key={answer.id} className="border-b border-[#8b7355]/20 pb-4 last:border-0">
+                        <p className="font-medium text-[#c4a574] mb-2">{answer.question.text}</p>
                         {answer.textAnswer && (
-                          <p className="text-zinc-400 whitespace-pre-wrap">{answer.textAnswer}</p>
+                          <p className="text-[#d4c4a8] whitespace-pre-wrap">{answer.textAnswer}</p>
                         )}
                         {answer.audioUrl && (
-                          <audio src={answer.audioUrl} controls className="w-full" />
+                          <audio src={answer.audioUrl} controls className="w-full mt-2" />
                         )}
                       </div>
                     ))}
                   </div>
                 </div>
               ) : (
-                <div className="card text-center text-zinc-500 py-12">
+                <div className="card text-center text-[#6b5a45] py-12">
                   Select an application to view details
                 </div>
               )}
@@ -393,7 +408,7 @@ export default function AdminPage() {
           <div className="space-y-6">
             {/* Add Question Form */}
             <div className="card">
-              <h2 className="font-semibold mb-4">Add New Question</h2>
+              <h2 className="font-['Special_Elite'] text-[#c4a574] uppercase tracking-wider mb-4">Add New Question</h2>
               <div className="grid md:grid-cols-4 gap-4">
                 <div className="md:col-span-2">
                   <input
@@ -450,22 +465,22 @@ export default function AdminPage() {
                         <button onClick={handleUpdateQuestion} className="btn btn-success flex-1">
                           Save
                         </button>
-                        <button onClick={() => setEditingQuestion(null)} className="btn bg-zinc-700">
+                        <button onClick={() => setEditingQuestion(null)} className="btn bg-[#2d261f] border-[#8b7355] text-[#d4c4a8]">
                           Cancel
                         </button>
                       </div>
                     </div>
                   ) : (
                     <div className="flex items-center gap-4">
-                      <span className="text-zinc-500 font-mono">{index + 1}.</span>
+                      <span className="text-[#c4a574] font-mono">{index + 1}.</span>
                       <div className="flex-1">
-                        <p className="font-medium">{question.text}</p>
-                        <p className="text-sm text-zinc-500 capitalize">{question.type}</p>
+                        <p className="font-medium text-[#d4c4a8]">{question.text}</p>
+                        <p className="text-sm text-[#6b5a45] capitalize">{question.type}</p>
                       </div>
                       <div className="flex gap-2">
                         <button
                           onClick={() => setEditingQuestion(question)}
-                          className="btn bg-zinc-700 text-sm"
+                          className="btn bg-[#2d261f] border-[#8b7355] text-[#d4c4a8] text-sm"
                         >
                           Edit
                         </button>
@@ -486,10 +501,10 @@ export default function AdminPage() {
 
         {/* Denial Modal */}
         {showDenialModal && selectedApp && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
             <div className="card max-w-md w-full">
-              <h2 className="text-xl font-bold mb-4">Deny Application</h2>
-              <p className="text-zinc-400 mb-4">
+              <h2 className="text-xl mb-4">Deny Application</h2>
+              <p className="text-[#8b7355] mb-4">
                 Optionally provide a reason for denying {selectedApp.discordName}'s application.
               </p>
               <textarea
@@ -508,7 +523,7 @@ export default function AdminPage() {
                 </button>
                 <button
                   onClick={() => setShowDenialModal(false)}
-                  className="btn bg-zinc-700 flex-1"
+                  className="btn bg-[#2d261f] border-[#8b7355] text-[#d4c4a8] flex-1"
                 >
                   Cancel
                 </button>

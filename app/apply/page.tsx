@@ -203,7 +203,7 @@ export default function ApplyPage() {
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#c4a574]"></div>
       </div>
     )
   }
@@ -214,9 +214,18 @@ export default function ApplyPage() {
     return (
       <main className="min-h-screen flex items-center justify-center p-4">
         <div className="card max-w-md w-full text-center">
-          <div className="text-red-500 text-5xl mb-4">!</div>
-          <h1 className="text-2xl font-bold mb-4">Not in Discord Server</h1>
-          <p className="text-zinc-400 mb-6">
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/logo.png"
+              alt={serverName}
+              width={120}
+              height={120}
+              className="opacity-90"
+            />
+          </div>
+          <div className="text-[#c4a574] text-5xl mb-4">!</div>
+          <h1 className="text-2xl mb-4">Not in Discord Server</h1>
+          <p className="text-[#8b7355] mb-6">
             You must join the {serverName} Discord server before applying.
           </p>
           <button onClick={() => signOut()} className="btn btn-primary">
@@ -229,14 +238,30 @@ export default function ApplyPage() {
 
   if (existingApp) {
     const statusColors: Record<string, string> = {
-      pending: 'text-yellow-500',
+      pending: 'text-[#c4a574]',
       approved: 'text-green-500',
       denied: 'text-red-500',
+    }
+
+    const statusLabels: Record<string, string> = {
+      pending: 'Under Review',
+      approved: 'Approved',
+      denied: 'Denied',
     }
 
     return (
       <main className="min-h-screen flex items-center justify-center p-4">
         <div className="card max-w-md w-full text-center">
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/logo.png"
+              alt={serverName}
+              width={120}
+              height={120}
+              className="opacity-90"
+            />
+          </div>
+
           <div className="flex items-center justify-center gap-3 mb-6">
             {session.user.image && (
               <Image
@@ -244,28 +269,30 @@ export default function ApplyPage() {
                 alt=""
                 width={48}
                 height={48}
-                className="rounded-full"
+                className="rounded-full border-2 border-[#8b7355]"
               />
             )}
             <div className="text-left">
-              <p className="font-medium">{session.user.name}</p>
-              <p className="text-sm text-zinc-400">Application submitted</p>
+              <p className="font-medium text-[#d4c4a8]">{session.user.name}</p>
+              <p className="text-sm text-[#8b7355]">Application submitted</p>
             </div>
           </div>
 
-          <h1 className="text-2xl font-bold mb-2">Application Status</h1>
-          <p className={`text-xl font-semibold capitalize ${statusColors[existingApp.status]}`}>
-            {existingApp.status}
-          </p>
+          <div className="border-t-2 border-b-2 border-double border-[#8b7355] py-6 mb-6">
+            <h2 className="text-lg mb-2 text-[#8b7355] font-['Special_Elite'] tracking-wider uppercase">Application Status</h2>
+            <p className={`text-2xl font-semibold ${statusColors[existingApp.status]}`}>
+              {statusLabels[existingApp.status]}
+            </p>
+          </div>
 
           {existingApp.status === 'denied' && existingApp.denialReason && (
-            <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-left">
-              <p className="text-sm text-zinc-400 mb-1">Denial Reason:</p>
+            <div className="mt-4 p-4 bg-red-900/20 border border-red-800/40 rounded text-left">
+              <p className="text-sm text-[#8b7355] mb-1">Denial Reason:</p>
               <p className="text-red-400">{existingApp.denialReason}</p>
             </div>
           )}
 
-          <p className="text-zinc-500 text-sm mt-6">
+          <p className="text-[#6b5a45] text-sm mt-6">
             Submitted {new Date(existingApp.createdAt).toLocaleDateString()}
           </p>
 
@@ -280,6 +307,7 @@ export default function ApplyPage() {
   return (
     <main className="min-h-screen py-12 px-4">
       <div className="max-w-2xl mx-auto">
+        {/* Header Card */}
         <div className="card mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -289,40 +317,60 @@ export default function ApplyPage() {
                   alt=""
                   width={40}
                   height={40}
-                  className="rounded-full"
+                  className="rounded-full border-2 border-[#8b7355]"
                 />
               )}
               <div>
-                <p className="font-medium">{session.user.name}</p>
-                <p className="text-sm text-zinc-400">Applying for whitelist</p>
+                <p className="font-medium text-[#d4c4a8]">{session.user.name}</p>
+                <p className="text-sm text-[#8b7355]">Applying for whitelist</p>
               </div>
             </div>
-            <button onClick={() => signOut()} className="text-sm text-zinc-400 hover:text-white">
+            <button onClick={() => signOut()} className="text-sm text-[#8b7355] hover:text-[#c4a574] transition-colors">
               Sign Out
             </button>
           </div>
         </div>
 
+        {/* Application Form Card */}
         <div className="card">
-          <h1 className="text-2xl font-bold mb-2">{serverName} Application</h1>
-          <p className="text-zinc-400 mb-8">Please answer all questions honestly.</p>
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/logo.png"
+              alt={serverName}
+              width={100}
+              height={100}
+              className="opacity-90"
+            />
+          </div>
+
+          <h1 className="text-2xl text-center mb-2">{serverName}</h1>
+          <p className="text-[#8b7355] text-center mb-8 font-['Special_Elite'] tracking-wider uppercase text-sm">
+            Whitelist Application
+          </p>
+
+          <div className="border-t-2 border-b-2 border-double border-[#8b7355] py-4 mb-8">
+            <p className="text-[#d4c4a8] text-center leading-relaxed">
+              Please answer all questions honestly and thoroughly.
+            </p>
+          </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+            <div className="mb-6 p-4 bg-red-900/20 border border-red-800/40 rounded text-red-400">
               {error}
             </div>
           )}
 
           {questions.length === 0 ? (
-            <p className="text-zinc-500 text-center py-8">
+            <p className="text-[#6b5a45] text-center py-8">
               No application questions have been set up yet. Please check back later.
             </p>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               {questions.map((question, index) => (
                 <div key={question.id} className="space-y-2">
-                  <label className="block font-medium">
-                    {index + 1}. {question.text}
+                  <label className="block font-medium text-[#d4c4a8]">
+                    <span className="text-[#c4a574] mr-2">{index + 1}.</span>
+                    {question.text}
                     {question.required && <span className="text-red-500 ml-1">*</span>}
                   </label>
 
@@ -368,7 +416,7 @@ export default function ApplyPage() {
                             <button
                               type="button"
                               onClick={() => stopRecording(question.id)}
-                              className="btn bg-red-600 hover:bg-red-700 text-white flex items-center gap-2"
+                              className="btn bg-red-800/80 hover:bg-red-700 text-white flex items-center gap-2"
                             >
                               <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
                               Stop Recording
@@ -387,7 +435,7 @@ export default function ApplyPage() {
                             </button>
                           )}
 
-                          <label className="btn bg-zinc-700 hover:bg-zinc-600 text-white cursor-pointer">
+                          <label className="btn bg-[#2d261f] hover:bg-[#3d3529] border-[#8b7355] text-[#d4c4a8] cursor-pointer">
                             Upload File
                             <input
                               type="file"
