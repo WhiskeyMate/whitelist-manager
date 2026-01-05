@@ -38,8 +38,10 @@ export default function ApplyPage() {
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/')
+    } else if (session?.user?.isAdmin) {
+      router.push('/admin')
     }
-  }, [status, router])
+  }, [status, session, router])
 
   useEffect(() => {
     if (session?.user?.id) {
