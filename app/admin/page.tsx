@@ -120,19 +120,26 @@ export default function AdminPage() {
   }
 
   async function handleAddQuestion() {
+    if (!newQuestion.text.trim()) {
+      alert('Please enter question text')
+      return
+    }
     try {
       const res = await fetch('/api/admin/questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newQuestion),
       })
+      const data = await res.json()
       if (res.ok) {
-        const data = await res.json()
         setQuestions(prev => [...prev, data.question])
         setNewQuestion({ text: '', type: 'text', required: true })
+      } else {
+        alert(`Error: ${data.error || 'Failed to add question'}`)
       }
     } catch (e) {
       console.error('Failed to add question:', e)
+      alert('Failed to add question - check console for details')
     }
   }
 
