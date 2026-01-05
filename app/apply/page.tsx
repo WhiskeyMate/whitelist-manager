@@ -324,8 +324,9 @@ export default function ApplyPage() {
 
   // Handle revision mode
   if (existingApp?.status === 'revision') {
+    const revisionIds = existingApp.revisionQuestionIds || []
     const revisionQuestions = existingApp.answers
-      .filter(a => existingApp.revisionQuestionIds.includes(a.questionId))
+      .filter(a => revisionIds.includes(a.questionId))
       .map(a => a.question)
 
     return (
