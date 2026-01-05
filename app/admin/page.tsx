@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Image from 'next/image'
 
 interface Application {
@@ -11,6 +11,10 @@ interface Application {
   discordName: string
   discordAvatar: string | null
   status: string
+  denialReason: string | null
+  reviewedBy: string | null
+  reviewedById: string | null
+  reviewedAt: string | null
   createdAt: string
   answers: {
     id: string
@@ -32,6 +36,29 @@ interface Question {
   order: number
 }
 
+// Helper function to convert URLs in text to clickable links
+function linkifyText(text: string) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g
+  const parts = text.split(urlRegex)
+
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#c4a574] hover:text-[#d4c4a8] underline break-all"
+        >
+          {part}
+        </a>
+      )
+    }
+    return part
+  })
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -43,6 +70,7 @@ export default function AdminPage() {
   const [processing, setProcessing] = useState(false)
   const [denialReason, setDenialReason] = useState('')
   const [showDenialModal, setShowDenialModal] = useState(false)
+  const [draggedQuestion, setDraggedQuestion] = useState<Question | null>(null)
 
   // Question form
   const [newQuestion, setNewQuestion] = useState({ text: '', type: 'text', required: true })
@@ -90,8 +118,9 @@ export default function AdminPage() {
         body: JSON.stringify({ status: 'approved' }),
       })
       if (res.ok) {
-        setApplications(prev => prev.map(a => a.id === appId ? { ...a, status: 'approved' } : a))
-        setSelectedApp(null)
+        const data = await res.json()
+        setApplications(prev => prev.map(a => a.id === appId ? { ...a, ...data.application } : a))
+        setSelectedApp(prev => prev?.id === appId ? { ...prev, ...data.application } : prev)
       }
     } catch (e) {
       console.error('Failed to approve:', e)
@@ -109,8 +138,9 @@ export default function AdminPage() {
         body: JSON.stringify({ status: 'denied', denialReason }),
       })
       if (res.ok) {
-        setApplications(prev => prev.map(a => a.id === appId ? { ...a, status: 'denied' } : a))
-        setSelectedApp(null)
+        const data = await res.json()
+        setApplications(prev => prev.map(a => a.id === appId ? { ...a, ...data.application } : a))
+        setSelectedApp(prev => prev?.id === appId ? { ...prev, ...data.application } : prev)
         setShowDenialModal(false)
         setDenialReason('')
       }
@@ -194,6 +224,51 @@ export default function AdminPage() {
       alert('Failed to delete application')
     }
   }
+
+  // Drag and drop handlers
+  const handleDragStart = useCallback((e: React.DragEvent, question: Question) => {
+    setDraggedQuestion(question)
+    e.dataTransfer.effectAllowed = 'move'
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent, targetQuestion: Question) => {
+    e.preventDefault()
+    if (!draggedQuestion || draggedQuestion.id === targetQuestion.id) return
+
+    const newQuestions = [...questions]
+    const draggedIndex = newQuestions.findIndex(q => q.id === draggedQuestion.id)
+    const targetIndex = newQuestions.findIndex(q => q.id === targetQuestion.id)
+
+    // Remove dragged item and insert at target position
+    newQuestions.splice(draggedIndex, 1)
+    newQuestions.splice(targetIndex, 0, draggedQuestion)
+
+    // Update local state immediately
+    setQuestions(newQuestions)
+    setDraggedQuestion(null)
+
+    // Save to server
+    try {
+      await fetch('/api/admin/questions/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionIds: newQuestions.map(q => q.id) }),
+      })
+    } catch (e) {
+      console.error('Failed to reorder questions:', e)
+      // Refetch on error
+      fetchData()
+    }
+  }, [draggedQuestion, questions])
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedQuestion(null)
+  }, [])
 
   if (status === 'loading' || loading) {
     return (
@@ -310,15 +385,28 @@ export default function AdminPage() {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#2d261f] rounded-full flex items-center justify-center border-2 border-[#8b7355] text-[#c4a574]">
-                      {app.discordName[0]}
-                    </div>
+                    {app.discordAvatar ? (
+                      <Image
+                        src={`https://cdn.discordapp.com/avatars/${app.discordId}/${app.discordAvatar}.png`}
+                        alt=""
+                        width={40}
+                        height={40}
+                        className="rounded-full border-2 border-[#8b7355]"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-[#2d261f] rounded-full flex items-center justify-center border-2 border-[#8b7355] text-[#c4a574]">
+                        {app.discordName[0]}
+                      </div>
+                    )}
                     <div className="flex-1">
                       <p className="font-medium text-[#d4c4a8]">{app.discordName}</p>
                       <p className={`text-sm capitalize ${
                         app.status === 'approved' ? 'text-green-500' : 'text-red-500'
                       }`}>
                         {app.status}
+                        {app.reviewedBy && (
+                          <span className="text-[#6b5a45]"> by {app.reviewedBy}</span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -380,12 +468,45 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  {/* Status info for processed applications */}
+                  {selectedApp.status !== 'pending' && (
+                    <div className={`mb-6 p-4 rounded border ${
+                      selectedApp.status === 'approved'
+                        ? 'bg-green-900/20 border-green-800/40'
+                        : 'bg-red-900/20 border-red-800/40'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`font-semibold capitalize ${
+                          selectedApp.status === 'approved' ? 'text-green-500' : 'text-red-500'
+                        }`}>
+                          {selectedApp.status}
+                        </span>
+                        {selectedApp.reviewedBy && (
+                          <span className="text-[#8b7355] text-sm">
+                            by {selectedApp.reviewedBy}
+                            {selectedApp.reviewedAt && (
+                              <> on {new Date(selectedApp.reviewedAt).toLocaleDateString()}</>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      {selectedApp.status === 'denied' && selectedApp.denialReason && (
+                        <p className="mt-2 text-[#d4c4a8]">
+                          <span className="text-[#8b7355]">Reason: </span>
+                          {selectedApp.denialReason}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="space-y-6">
                     {selectedApp.answers.map(answer => (
                       <div key={answer.id} className="border-b border-[#8b7355]/20 pb-4 last:border-0">
                         <p className="font-medium text-[#c4a574] mb-2">{answer.question.text}</p>
                         {answer.textAnswer && (
-                          <p className="text-[#d4c4a8] whitespace-pre-wrap">{answer.textAnswer}</p>
+                          <p className="text-[#d4c4a8] whitespace-pre-wrap">
+                            {linkifyText(answer.textAnswer)}
+                          </p>
                         )}
                         {answer.audioUrl && (
                           <audio src={answer.audioUrl} controls className="w-full mt-2" />
@@ -438,10 +559,23 @@ export default function AdminPage() {
               </div>
             </div>
 
+            {/* Drag hint */}
+            <p className="text-[#6b5a45] text-sm">Drag and drop questions to reorder them</p>
+
             {/* Questions List */}
             <div className="space-y-4">
               {questions.map((question, index) => (
-                <div key={question.id} className="card">
+                <div
+                  key={question.id}
+                  draggable={!editingQuestion}
+                  onDragStart={(e) => handleDragStart(e, question)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, question)}
+                  onDragEnd={handleDragEnd}
+                  className={`card transition-all ${
+                    draggedQuestion?.id === question.id ? 'opacity-50 scale-95' : ''
+                  } ${!editingQuestion ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                >
                   {editingQuestion?.id === question.id ? (
                     <div className="grid md:grid-cols-4 gap-4">
                       <div className="md:col-span-2">
@@ -472,6 +606,11 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-4">
+                      <div className="text-[#6b5a45] cursor-grab">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                        </svg>
+                      </div>
                       <span className="text-[#c4a574] font-mono">{index + 1}.</span>
                       <div className="flex-1">
                         <p className="font-medium text-[#d4c4a8]">{question.text}</p>

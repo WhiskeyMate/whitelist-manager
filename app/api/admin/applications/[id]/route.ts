@@ -26,10 +26,16 @@ export async function PUT(
       return NextResponse.json({ error: 'Application not found' }, { status: 404 })
     }
 
-    // Update application
+    // Update application with reviewer info
     const updatedApp = await prisma.application.update({
       where: { id: appId },
-      data: { status, denialReason },
+      data: {
+        status,
+        denialReason,
+        reviewedBy: session.user.name,
+        reviewedById: (session.user as any).id,
+        reviewedAt: new Date(),
+      },
     })
 
     const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
