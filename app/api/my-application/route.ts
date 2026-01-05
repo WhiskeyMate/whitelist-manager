@@ -14,6 +14,11 @@ export async function GET() {
     const application = await prisma.application.findFirst({
       where: { discordId: session.user.id },
       orderBy: { createdAt: 'desc' },
+      include: {
+        answers: {
+          include: { question: true }
+        }
+      }
     })
     return NextResponse.json({ application })
   } catch (error) {
