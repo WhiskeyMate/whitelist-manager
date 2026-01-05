@@ -3,6 +3,14 @@ import DiscordProvider from 'next-auth/providers/discord'
 
 const ADMIN_IDS = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim())
 
+interface DiscordProfile {
+  id: string
+  username: string
+  avatar: string
+  discriminator: string
+  email?: string
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     DiscordProvider({
@@ -18,8 +26,9 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, account, profile }) {
       if (account && profile) {
-        token.id = profile.id
-        token.isAdmin = ADMIN_IDS.includes(profile.id as string)
+        const discordProfile = profile as DiscordProfile
+        token.id = discordProfile.id
+        token.isAdmin = ADMIN_IDS.includes(discordProfile.id)
       }
       return token
     },
