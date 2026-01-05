@@ -15,30 +15,51 @@ export async function PUT(
   }
 
   try {
-    const { status, denialReason } = await req.json()
+    const { status, denialReason, revisionReason, revisionQuestionIds } = await req.json()
     const appId = params.id
 
     const application = await prisma.application.findUnique({
       where: { id: appId },
+      include: {
+        answers: {
+          include: { question: true }
+        }
+      }
     })
 
     if (!application) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 })
     }
 
+    const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
+
+    // Build update data
+    const updateData: any = {
+      status,
+      reviewedBy: session.user.name,
+      reviewedById: (session.user as any).id,
+      reviewedAt: new Date(),
+    }
+
+    if (status === 'denied') {
+      updateData.denialReason = denialReason
+      updateData.revisionReason = null
+      updateData.revisionQuestionIds = []
+    } else if (status === 'revision') {
+      updateData.revisionReason = revisionReason
+      updateData.revisionQuestionIds = revisionQuestionIds || []
+      updateData.denialReason = null
+    } else if (status === 'approved') {
+      updateData.denialReason = null
+      updateData.revisionReason = null
+      updateData.revisionQuestionIds = []
+    }
+
     // Update application with reviewer info
     const updatedApp = await prisma.application.update({
       where: { id: appId },
-      data: {
-        status,
-        denialReason,
-        reviewedBy: session.user.name,
-        reviewedById: (session.user as any).id,
-        reviewedAt: new Date(),
-      },
+      data: updateData,
     })
-
-    const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
 
     // Handle Discord actions
     if (status === 'approved') {
@@ -60,9 +81,23 @@ export async function PUT(
       await sendEmbedDM(application.discordId, {
         title: 'Application Denied',
         description: denialReason
-          ? `Unfortunately, your application to **${serverName}** was not approved.\n\n**Reason:** ${denialReason}`
-          : `Unfortunately, your application to **${serverName}** was not approved at this time.`,
+          ? `Unfortunately, your application to **${serverName}** was not approved.\n\n**Reason:** ${denialReason}\n\nYou may re-apply after 7 days.`
+          : `Unfortunately, your application to **${serverName}** was not approved at this time.\n\nYou may re-apply after 7 days.`,
         color: 0xef4444, // red
+        timestamp: new Date().toISOString(),
+      })
+    } else if (status === 'revision') {
+      // Get question texts for the revision request
+      const questionTexts = application.answers
+        .filter(a => revisionQuestionIds?.includes(a.questionId))
+        .map(a => `- ${a.question.text}`)
+        .join('\n')
+
+      // Send revision DM
+      await sendEmbedDM(application.discordId, {
+        title: 'Application Revision Requested',
+        description: `Your application to **${serverName}** requires revision.\n\n**Reason:** ${revisionReason || 'Please review and update your answers.'}\n\n**Questions to revise:**\n${questionTexts}\n\nPlease visit the application page to submit your revised answers.`,
+        color: 0xf59e0b, // amber/orange
         timestamp: new Date().toISOString(),
       })
     }

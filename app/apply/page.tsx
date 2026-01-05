@@ -19,6 +19,27 @@ interface AudioState {
   uploadedFile: File | null
 }
 
+interface ExistingApp {
+  id: string
+  status: string
+  denialReason: string | null
+  revisionReason: string | null
+  revisionQuestionIds: string[]
+  reviewedAt: string | null
+  createdAt: string
+  answers: {
+    id: string
+    questionId: string
+    textAnswer: string | null
+    audioUrl: string | null
+    question: {
+      id: string
+      text: string
+      type: string
+    }
+  }[]
+}
+
 export default function ApplyPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -28,7 +49,7 @@ export default function ApplyPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [existingApp, setExistingApp] = useState<any>(null)
+  const [existingApp, setExistingApp] = useState<ExistingApp | null>(null)
   const [inGuild, setInGuild] = useState<boolean | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -202,6 +223,69 @@ export default function ApplyPage() {
     }
   }
 
+  async function handleRevisionSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    setError('')
+
+    try {
+      // Prepare form data (only for revision questions)
+      const formData = new FormData()
+      formData.append('answers', JSON.stringify(answers))
+
+      // Add audio files for revision questions
+      for (const questionId of existingApp?.revisionQuestionIds || []) {
+        const state = audioStates[questionId]
+        if (state?.audioBlob) {
+          formData.append(`audio_${questionId}`, state.audioBlob, `${questionId}.webm`)
+        } else if (state?.uploadedFile) {
+          formData.append(`audio_${questionId}`, state.uploadedFile)
+        }
+      }
+
+      const res = await fetch('/api/apply/revision', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to submit revision')
+      }
+
+      // Refresh to show submitted state
+      setExistingApp(data.application)
+      setAnswers({})
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Calculate if denied user can re-apply (7 days after denial)
+  function canReapply(): { allowed: boolean; daysRemaining: number } {
+    if (!existingApp || existingApp.status !== 'denied') {
+      return { allowed: false, daysRemaining: 0 }
+    }
+
+    const reviewedAt = existingApp.reviewedAt ? new Date(existingApp.reviewedAt) : null
+    if (!reviewedAt) {
+      return { allowed: false, daysRemaining: 7 }
+    }
+
+    const now = new Date()
+    const diffMs = now.getTime() - reviewedAt.getTime()
+    const diffDays = diffMs / (1000 * 60 * 60 * 24)
+    const daysRemaining = Math.ceil(7 - diffDays)
+
+    return {
+      allowed: diffDays >= 7,
+      daysRemaining: Math.max(0, daysRemaining),
+    }
+  }
+
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -238,6 +322,192 @@ export default function ApplyPage() {
     )
   }
 
+  // Handle revision mode
+  if (existingApp?.status === 'revision') {
+    const revisionQuestions = existingApp.answers
+      .filter(a => existingApp.revisionQuestionIds.includes(a.questionId))
+      .map(a => a.question)
+
+    return (
+      <main className="min-h-screen py-12 px-4">
+        <div className="max-w-2xl mx-auto">
+          {/* Header Card */}
+          <div className="card mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {session.user.image && (
+                  <Image
+                    src={session.user.image}
+                    alt=""
+                    width={40}
+                    height={40}
+                    className="rounded-full border-2 border-[#8b7355]"
+                  />
+                )}
+                <div>
+                  <p className="font-medium text-[#d4c4a8]">{session.user.name}</p>
+                  <p className="text-sm text-amber-500">Revision Requested</p>
+                </div>
+              </div>
+              <button onClick={() => signOut()} className="text-sm text-[#8b7355] hover:text-[#c4a574] transition-colors">
+                Sign Out
+              </button>
+            </div>
+          </div>
+
+          {/* Revision Form Card */}
+          <div className="card">
+            <div className="flex justify-center mb-6">
+              <Image
+                src="/logo.png"
+                alt={serverName}
+                width={100}
+                height={100}
+                className="opacity-90"
+              />
+            </div>
+
+            <h1 className="text-2xl text-center mb-2 text-amber-500">Revision Required</h1>
+            <p className="text-[#8b7355] text-center mb-4 font-['Special_Elite'] tracking-wider uppercase text-sm">
+              Please update the following answers
+            </p>
+
+            {existingApp.revisionReason && (
+              <div className="mb-6 p-4 bg-amber-900/20 border border-amber-800/40 rounded">
+                <p className="text-sm text-[#8b7355] mb-1">Revision Reason:</p>
+                <p className="text-amber-400">{existingApp.revisionReason}</p>
+              </div>
+            )}
+
+            {error && (
+              <div className="mb-6 p-4 bg-red-900/20 border border-red-800/40 rounded text-red-400">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleRevisionSubmit} className="space-y-6">
+              {revisionQuestions.map((question, index) => {
+                const existingAnswer = existingApp.answers.find(a => a.questionId === question.id)
+
+                return (
+                  <div key={question.id} className="space-y-2 p-4 bg-amber-900/10 rounded border border-amber-800/30">
+                    <label className="block font-medium text-amber-500">
+                      <span className="mr-2">{index + 1}.</span>
+                      {question.text}
+                    </label>
+
+                    {/* Show previous answer */}
+                    <div className="mb-3 p-3 bg-[#1a1410] rounded">
+                      <p className="text-xs text-[#6b5a45] mb-1">Your previous answer:</p>
+                      {existingAnswer?.textAnswer && (
+                        <p className="text-[#8b7355] text-sm">{existingAnswer.textAnswer}</p>
+                      )}
+                      {existingAnswer?.audioUrl && (
+                        <audio src={existingAnswer.audioUrl} controls className="w-full mt-2" />
+                      )}
+                    </div>
+
+                    <p className="text-xs text-amber-600 mb-2">Enter your revised answer below:</p>
+
+                    {question.type === 'text' && (
+                      <input
+                        type="text"
+                        className="input border-amber-800/50"
+                        value={answers[question.id] || ''}
+                        onChange={(e) => setAnswers(prev => ({ ...prev, [question.id]: e.target.value }))}
+                        placeholder="Enter revised answer"
+                        required
+                      />
+                    )}
+
+                    {question.type === 'textarea' && (
+                      <textarea
+                        className="input min-h-[120px] border-amber-800/50"
+                        value={answers[question.id] || ''}
+                        onChange={(e) => setAnswers(prev => ({ ...prev, [question.id]: e.target.value }))}
+                        placeholder="Enter revised answer"
+                        required
+                      />
+                    )}
+
+                    {question.type === 'audio' && (
+                      <div className="space-y-3">
+                        {audioStates[question.id]?.audioUrl ? (
+                          <div className="flex items-center gap-3">
+                            <audio
+                              src={audioStates[question.id].audioUrl!}
+                              controls
+                              className="flex-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => clearAudio(question.id)}
+                              className="btn btn-danger text-sm"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-3">
+                            {audioStates[question.id]?.isRecording ? (
+                              <button
+                                type="button"
+                                onClick={() => stopRecording(question.id)}
+                                className="btn bg-red-800/80 hover:bg-red-700 text-white flex items-center gap-2"
+                              >
+                                <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
+                                Stop Recording
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => startRecording(question.id)}
+                                className="btn bg-amber-700 hover:bg-amber-600 text-white flex items-center gap-2"
+                              >
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                                </svg>
+                                Record New Audio
+                              </button>
+                            )}
+
+                            <label className="btn bg-[#2d261f] hover:bg-[#3d3529] border-amber-800/50 text-[#d4c4a8] cursor-pointer">
+                              Upload File
+                              <input
+                                type="file"
+                                accept="audio/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  if (e.target.files?.[0]) {
+                                    handleFileUpload(question.id, e.target.files[0])
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="btn bg-amber-700 hover:bg-amber-600 text-white w-full mt-8"
+              >
+                {submitting ? 'Submitting Revision...' : 'Submit Revision'}
+              </button>
+            </form>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  // Handle existing application status display
   if (existingApp) {
     const statusColors: Record<string, string> = {
       pending: 'text-[#c4a574]',
@@ -250,6 +520,8 @@ export default function ApplyPage() {
       approved: 'Approved',
       denied: 'Denied',
     }
+
+    const reapplyStatus = canReapply()
 
     return (
       <main className="min-h-screen flex items-center justify-center p-4">
@@ -291,6 +563,31 @@ export default function ApplyPage() {
             <div className="mt-4 p-4 bg-red-900/20 border border-red-800/40 rounded text-left">
               <p className="text-sm text-[#8b7355] mb-1">Denial Reason:</p>
               <p className="text-red-400">{existingApp.denialReason}</p>
+            </div>
+          )}
+
+          {existingApp.status === 'denied' && (
+            <div className="mt-4">
+              {reapplyStatus.allowed ? (
+                <div className="p-4 bg-[#2d261f] border border-[#8b7355]/30 rounded">
+                  <p className="text-[#d4c4a8] mb-3">You may now submit a new application.</p>
+                  <button
+                    onClick={() => {
+                      setExistingApp(null)
+                      setAnswers({})
+                    }}
+                    className="btn btn-primary"
+                  >
+                    Apply Again
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 bg-[#2d261f] border border-[#8b7355]/30 rounded">
+                  <p className="text-[#8b7355]">
+                    You may re-apply in <span className="text-[#c4a574] font-semibold">{reapplyStatus.daysRemaining} day{reapplyStatus.daysRemaining !== 1 ? 's' : ''}</span>
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

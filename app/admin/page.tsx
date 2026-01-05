@@ -12,6 +12,8 @@ interface Application {
   discordAvatar: string | null
   status: string
   denialReason: string | null
+  revisionReason: string | null
+  revisionQuestionIds: string[]
   reviewedBy: string | null
   reviewedById: string | null
   reviewedAt: string | null
@@ -72,6 +74,11 @@ export default function AdminPage() {
   const [showDenialModal, setShowDenialModal] = useState(false)
   const [draggedQuestion, setDraggedQuestion] = useState<Question | null>(null)
 
+  // Revision state
+  const [revisionQuestionIds, setRevisionQuestionIds] = useState<string[]>([])
+  const [revisionReason, setRevisionReason] = useState('')
+  const [showRevisionModal, setShowRevisionModal] = useState(false)
+
   // Question form
   const [newQuestion, setNewQuestion] = useState({ text: '', type: 'text', required: true })
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
@@ -91,6 +98,11 @@ export default function AdminPage() {
       fetchData()
     }
   }, [session])
+
+  // Reset revision checkboxes when selecting a different application
+  useEffect(() => {
+    setRevisionQuestionIds([])
+  }, [selectedApp?.id])
 
   async function fetchData() {
     try {
@@ -149,6 +161,45 @@ export default function AdminPage() {
     } finally {
       setProcessing(false)
     }
+  }
+
+  async function handleSendRevision(appId: string) {
+    if (revisionQuestionIds.length === 0) {
+      alert('Please select at least one question to revise')
+      return
+    }
+    setProcessing(true)
+    try {
+      const res = await fetch(`/api/admin/applications/${appId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'revision',
+          revisionReason,
+          revisionQuestionIds,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setApplications(prev => prev.map(a => a.id === appId ? { ...a, ...data.application } : a))
+        setSelectedApp(prev => prev?.id === appId ? { ...prev, ...data.application } : prev)
+        setShowRevisionModal(false)
+        setRevisionReason('')
+        setRevisionQuestionIds([])
+      }
+    } catch (e) {
+      console.error('Failed to send revision:', e)
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  function toggleRevisionQuestion(questionId: string) {
+    setRevisionQuestionIds(prev =>
+      prev.includes(questionId)
+        ? prev.filter(id => id !== questionId)
+        : [...prev, questionId]
+    )
   }
 
   async function handleAddQuestion() {
@@ -281,7 +332,27 @@ export default function AdminPage() {
   if (!session?.user?.isAdmin) return null
 
   const pendingApps = applications.filter(a => a.status === 'pending')
-  const processedApps = applications.filter(a => a.status !== 'pending')
+  const revisionApps = applications.filter(a => a.status === 'revision')
+  const processedApps = applications.filter(a => a.status !== 'pending' && a.status !== 'revision')
+
+  // Get status color helper
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved': return 'text-green-500'
+      case 'denied': return 'text-red-500'
+      case 'revision': return 'text-amber-500'
+      default: return 'text-[#c4a574]'
+    }
+  }
+
+  const getStatusBg = (status: string) => {
+    switch (status) {
+      case 'approved': return 'bg-green-900/20 border-green-800/40'
+      case 'denied': return 'bg-red-900/20 border-red-800/40'
+      case 'revision': return 'bg-amber-900/20 border-amber-800/40'
+      default: return 'bg-[#2d261f] border-[#8b7355]/30'
+    }
+  }
 
   return (
     <main className="min-h-screen py-8 px-4">
@@ -319,7 +390,7 @@ export default function AdminPage() {
                 : 'bg-[#2d261f] text-[#8b7355] hover:text-[#c4a574] border border-[#8b7355]/30'
             }`}
           >
-            Applications ({pendingApps.length} pending)
+            Applications ({pendingApps.length} pending{revisionApps.length > 0 ? `, ${revisionApps.length} revision` : ''})
           </button>
           <button
             onClick={() => setTab('questions')}
@@ -375,6 +446,44 @@ export default function AdminPage() {
                 ))
               )}
 
+              {/* Revision section */}
+              {revisionApps.length > 0 && (
+                <>
+                  <h2 className="font-['Special_Elite'] text-amber-500 uppercase tracking-wider text-sm mt-8">Awaiting Revision</h2>
+                  {revisionApps.map(app => (
+                    <div
+                      key={app.id}
+                      onClick={() => setSelectedApp(app)}
+                      className={`card cursor-pointer hover:border-amber-500 transition-colors ${
+                        selectedApp?.id === app.id ? 'border-amber-500' : 'border-amber-800/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {app.discordAvatar ? (
+                          <Image
+                            src={`https://cdn.discordapp.com/avatars/${app.discordId}/${app.discordAvatar}.png`}
+                            alt=""
+                            width={40}
+                            height={40}
+                            className="rounded-full border-2 border-amber-700"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-[#2d261f] rounded-full flex items-center justify-center border-2 border-amber-700 text-amber-500">
+                            {app.discordName[0]}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-[#d4c4a8]">{app.discordName}</p>
+                          <p className="text-sm text-amber-600">
+                            {app.revisionQuestionIds?.length || 0} question(s) to revise
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
               <h2 className="font-['Special_Elite'] text-[#c4a574] uppercase tracking-wider text-sm mt-8">Processed</h2>
               {processedApps.slice(0, 10).map(app => (
                 <div
@@ -400,9 +509,7 @@ export default function AdminPage() {
                     )}
                     <div className="flex-1">
                       <p className="font-medium text-[#d4c4a8]">{app.discordName}</p>
-                      <p className={`text-sm capitalize ${
-                        app.status === 'approved' ? 'text-green-500' : 'text-red-500'
-                      }`}>
+                      <p className={`text-sm capitalize ${getStatusColor(app.status)}`}>
                         {app.status}
                         {app.reviewedBy && (
                           <span className="text-[#6b5a45]"> by {app.reviewedBy}</span>
@@ -438,8 +545,8 @@ export default function AdminPage() {
                         <p className="text-sm text-[#6b5a45]">ID: {selectedApp.discordId}</p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      {selectedApp.status === 'pending' && (
+                    <div className="flex gap-2 flex-wrap justify-end">
+                      {(selectedApp.status === 'pending' || selectedApp.status === 'revision') && (
                         <>
                           <button
                             onClick={() => handleApprove(selectedApp.id)}
@@ -457,6 +564,15 @@ export default function AdminPage() {
                           </button>
                         </>
                       )}
+                      {selectedApp.status === 'pending' && revisionQuestionIds.length > 0 && (
+                        <button
+                          onClick={() => setShowRevisionModal(true)}
+                          disabled={processing}
+                          className="btn bg-amber-700 hover:bg-amber-600 text-white"
+                        >
+                          Send Revision ({revisionQuestionIds.length})
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDeleteApplication(selectedApp.id)}
                         disabled={processing}
@@ -470,16 +586,10 @@ export default function AdminPage() {
 
                   {/* Status info for processed applications */}
                   {selectedApp.status !== 'pending' && (
-                    <div className={`mb-6 p-4 rounded border ${
-                      selectedApp.status === 'approved'
-                        ? 'bg-green-900/20 border-green-800/40'
-                        : 'bg-red-900/20 border-red-800/40'
-                    }`}>
+                    <div className={`mb-6 p-4 rounded border ${getStatusBg(selectedApp.status)}`}>
                       <div className="flex items-center justify-between">
-                        <span className={`font-semibold capitalize ${
-                          selectedApp.status === 'approved' ? 'text-green-500' : 'text-red-500'
-                        }`}>
-                          {selectedApp.status}
+                        <span className={`font-semibold capitalize ${getStatusColor(selectedApp.status)}`}>
+                          {selectedApp.status === 'revision' ? 'Revision Requested' : selectedApp.status}
                         </span>
                         {selectedApp.reviewedBy && (
                           <span className="text-[#8b7355] text-sm">
@@ -496,23 +606,61 @@ export default function AdminPage() {
                           {selectedApp.denialReason}
                         </p>
                       )}
+                      {selectedApp.status === 'revision' && selectedApp.revisionReason && (
+                        <p className="mt-2 text-[#d4c4a8]">
+                          <span className="text-[#8b7355]">Reason: </span>
+                          {selectedApp.revisionReason}
+                        </p>
+                      )}
                     </div>
                   )}
 
                   <div className="space-y-6">
-                    {selectedApp.answers.map(answer => (
-                      <div key={answer.id} className="border-b border-[#8b7355]/20 pb-4 last:border-0">
-                        <p className="font-medium text-[#c4a574] mb-2">{answer.question.text}</p>
-                        {answer.textAnswer && (
-                          <p className="text-[#d4c4a8] whitespace-pre-wrap">
-                            {linkifyText(answer.textAnswer)}
-                          </p>
-                        )}
-                        {answer.audioUrl && (
-                          <audio src={answer.audioUrl} controls className="w-full mt-2" />
-                        )}
-                      </div>
-                    ))}
+                    {selectedApp.answers.map(answer => {
+                      const needsRevision = selectedApp.revisionQuestionIds?.includes(answer.question.id)
+                      const isSelectedForRevision = revisionQuestionIds.includes(answer.question.id)
+
+                      return (
+                        <div
+                          key={answer.id}
+                          className={`border-b border-[#8b7355]/20 pb-4 last:border-0 ${
+                            needsRevision ? 'bg-amber-900/10 -mx-4 px-4 py-2 rounded border border-amber-800/30' : ''
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            {/* Checkbox for revision (only show for pending apps) */}
+                            {selectedApp.status === 'pending' && (
+                              <label className="flex items-center mt-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelectedForRevision}
+                                  onChange={() => toggleRevisionQuestion(answer.question.id)}
+                                  className="w-4 h-4 rounded border-[#8b7355] bg-[#2d261f] text-amber-500 focus:ring-amber-500 cursor-pointer"
+                                />
+                              </label>
+                            )}
+                            <div className="flex-1">
+                              <p className={`font-medium mb-2 ${needsRevision ? 'text-amber-500' : 'text-[#c4a574]'}`}>
+                                {answer.question.text}
+                                {needsRevision && (
+                                  <span className="ml-2 text-xs bg-amber-700 text-white px-2 py-0.5 rounded">
+                                    Needs Revision
+                                  </span>
+                                )}
+                              </p>
+                              {answer.textAnswer && (
+                                <p className="text-[#d4c4a8] whitespace-pre-wrap">
+                                  {linkifyText(answer.textAnswer)}
+                                </p>
+                              )}
+                              {answer.audioUrl && (
+                                <audio src={answer.audioUrl} controls className="w-full mt-2" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               ) : (
@@ -645,6 +793,7 @@ export default function AdminPage() {
               <h2 className="text-xl mb-4">Deny Application</h2>
               <p className="text-[#8b7355] mb-4">
                 Optionally provide a reason for denying {selectedApp.discordName}'s application.
+                They may re-apply after 7 days.
               </p>
               <textarea
                 className="input mb-4"
@@ -662,6 +811,52 @@ export default function AdminPage() {
                 </button>
                 <button
                   onClick={() => setShowDenialModal(false)}
+                  className="btn bg-[#2d261f] border-[#8b7355] text-[#d4c4a8] flex-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Revision Modal */}
+        {showRevisionModal && selectedApp && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+            <div className="card max-w-md w-full">
+              <h2 className="text-xl mb-4 text-amber-500">Request Revision</h2>
+              <p className="text-[#8b7355] mb-2">
+                Requesting revision for {revisionQuestionIds.length} question(s) from {selectedApp.discordName}.
+              </p>
+              <div className="mb-4 text-sm text-[#6b5a45]">
+                <p className="mb-2">Questions to revise:</p>
+                <ul className="list-disc list-inside">
+                  {selectedApp.answers
+                    .filter(a => revisionQuestionIds.includes(a.question.id))
+                    .map(a => (
+                      <li key={a.id} className="text-[#d4c4a8]">{a.question.text}</li>
+                    ))}
+                </ul>
+              </div>
+              <textarea
+                className="input mb-4"
+                placeholder="Reason for revision request"
+                value={revisionReason}
+                onChange={(e) => setRevisionReason(e.target.value)}
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleSendRevision(selectedApp.id)}
+                  disabled={processing}
+                  className="btn bg-amber-700 hover:bg-amber-600 text-white flex-1"
+                >
+                  Send Revision Request
+                </button>
+                <button
+                  onClick={() => {
+                    setShowRevisionModal(false)
+                    setRevisionReason('')
+                  }}
                   className="btn bg-[#2d261f] border-[#8b7355] text-[#d4c4a8] flex-1"
                 >
                   Cancel
