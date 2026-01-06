@@ -156,7 +156,14 @@ export default function ApplyPage() {
     }
   }
 
+  const MAX_UPLOAD_SIZE = 10 * 1024 * 1024 // 10MB limit for uploaded files
+
   function handleFileUpload(questionId: string, file: File) {
+    if (file.size > MAX_UPLOAD_SIZE) {
+      setError(`File too large. Maximum size is 10MB.`)
+      return
+    }
+    setError('')
     const url = URL.createObjectURL(file)
     setAudioStates(prev => ({
       ...prev,
