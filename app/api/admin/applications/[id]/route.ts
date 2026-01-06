@@ -96,10 +96,12 @@ export async function PUT(
         .map(a => `- ${a.question.text}`)
         .join('\n')
 
+      const appUrl = process.env.NEXTAUTH_URL || 'https://whitelist.rosalitarp.com'
+
       // Send revision DM
       await sendEmbedDM(application.discordId, {
         title: 'Application Revision Requested',
-        description: `Your application to **${serverName}** requires revision.\n\n**Reason:** ${revisionReason || 'Please review and update your answers.'}\n\n**Questions to revise:**\n${questionTexts}\n\nPlease visit the application page to submit your revised answers.`,
+        description: `Your application to **${serverName}** requires revision.\n\n**Reason:** ${revisionReason || 'Please review and update your answers.'}\n\n**Questions to revise:**\n${questionTexts}\n\n[Click here to submit your revised answers](${appUrl}/apply)`,
         color: 0xf59e0b, // amber/orange
         timestamp: new Date().toISOString(),
       })
