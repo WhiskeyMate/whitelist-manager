@@ -191,10 +191,41 @@ export default function ApplyPage() {
     }))
   }
 
+  // Check if all required questions are answered
+  function validateAnswers(): { valid: boolean; missingQuestions: number[] } {
+    const missingQuestions: number[] = []
+
+    questions.forEach((question, index) => {
+      if (question.type === 'audio') {
+        // Audio questions require either a recorded blob or uploaded file
+        const audioState = audioStates[question.id]
+        if (!audioState?.audioBlob && !audioState?.uploadedFile) {
+          missingQuestions.push(index + 1)
+        }
+      } else {
+        // Text/textarea questions require non-empty answer
+        const answer = answers[question.id]?.trim()
+        if (!answer) {
+          missingQuestions.push(index + 1)
+        }
+      }
+    })
+
+    return { valid: missingQuestions.length === 0, missingQuestions }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     setError('')
+
+    // Validate all questions are answered
+    const validation = validateAnswers()
+    if (!validation.valid) {
+      setError(`Please answer all questions before submitting. Missing: Question${validation.missingQuestions.length > 1 ? 's' : ''} ${validation.missingQuestions.join(', ')}`)
+      setSubmitting(false)
+      return
+    }
 
     try {
       // Prepare form data
@@ -230,10 +261,43 @@ export default function ApplyPage() {
     }
   }
 
+  // Check if all revision questions are answered
+  function validateRevisionAnswers(): { valid: boolean; missingQuestions: number[] } {
+    const missingQuestions: number[] = []
+    const revisionIds = existingApp?.revisionQuestionIds || []
+    const revisionQuestions = existingApp?.answers
+      .filter(a => revisionIds.includes(a.questionId))
+      .map(a => a.question) || []
+
+    revisionQuestions.forEach((question, index) => {
+      if (question.type === 'audio') {
+        const audioState = audioStates[question.id]
+        if (!audioState?.audioBlob && !audioState?.uploadedFile) {
+          missingQuestions.push(index + 1)
+        }
+      } else {
+        const answer = answers[question.id]?.trim()
+        if (!answer) {
+          missingQuestions.push(index + 1)
+        }
+      }
+    })
+
+    return { valid: missingQuestions.length === 0, missingQuestions }
+  }
+
   async function handleRevisionSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     setError('')
+
+    // Validate all revision questions are answered
+    const validation = validateRevisionAnswers()
+    if (!validation.valid) {
+      setError(`Please answer all questions before submitting. Missing: Question${validation.missingQuestions.length > 1 ? 's' : ''} ${validation.missingQuestions.join(', ')}`)
+      setSubmitting(false)
+      return
+    }
 
     try {
       // Prepare form data (only for revision questions)
@@ -678,7 +742,7 @@ export default function ApplyPage() {
                   <label className="block font-medium text-[#d4c4a8]">
                     <span className="text-[#c4a574] mr-2">{index + 1}.</span>
                     {question.text}
-                    {question.required && <span className="text-red-500 ml-1">*</span>}
+                    <span className="text-red-500 ml-1">*</span>
                   </label>
 
                   {question.type === 'text' && (
@@ -687,7 +751,6 @@ export default function ApplyPage() {
                       className="input"
                       value={answers[question.id] || ''}
                       onChange={(e) => setAnswers(prev => ({ ...prev, [question.id]: e.target.value }))}
-                      required={question.required}
                     />
                   )}
 
@@ -696,7 +759,6 @@ export default function ApplyPage() {
                       className="input min-h-[120px]"
                       value={answers[question.id] || ''}
                       onChange={(e) => setAnswers(prev => ({ ...prev, [question.id]: e.target.value }))}
-                      required={question.required}
                     />
                   )}
 
