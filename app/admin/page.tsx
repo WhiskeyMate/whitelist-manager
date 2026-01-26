@@ -65,7 +65,7 @@ function linkifyText(text: string) {
 export default function AdminPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [tab, setTab] = useState<'applications' | 'questions'>('applications')
+  const [tab, setTab] = useState<'applications' | 'questions' | 'manual'>('applications')
   const [applications, setApplications] = useState<Application[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [selectedApp, setSelectedApp] = useState<Application | null>(null)
@@ -83,6 +83,11 @@ export default function AdminPage() {
   // Question form
   const [newQuestion, setNewQuestion] = useState({ text: '', type: 'text', required: true })
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
+
+  // Manual whitelist state
+  const [manualDiscordId, setManualDiscordId] = useState('')
+  const [manualWhitelistLoading, setManualWhitelistLoading] = useState(false)
+  const [manualWhitelistResult, setManualWhitelistResult] = useState<{ success: boolean; message: string } | null>(null)
 
   const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
 
@@ -277,6 +282,38 @@ export default function AdminPage() {
     }
   }
 
+  async function handleManualWhitelist() {
+    if (!manualDiscordId.trim()) {
+      setManualWhitelistResult({ success: false, message: 'Please enter a Discord ID' })
+      return
+    }
+
+    setManualWhitelistLoading(true)
+    setManualWhitelistResult(null)
+
+    try {
+      const res = await fetch('/api/admin/whitelist/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discordId: manualDiscordId.trim() }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setManualWhitelistResult({ success: true, message: data.message })
+        setManualDiscordId('')
+      } else {
+        setManualWhitelistResult({ success: false, message: data.error || 'Failed to whitelist user' })
+      }
+    } catch (e) {
+      console.error('Failed to manually whitelist:', e)
+      setManualWhitelistResult({ success: false, message: 'An error occurred while whitelisting the user' })
+    } finally {
+      setManualWhitelistLoading(false)
+    }
+  }
+
   // Drag and drop handlers
   const handleDragStart = useCallback((e: React.DragEvent, question: Question) => {
     setDraggedQuestion(question)
@@ -402,6 +439,16 @@ export default function AdminPage() {
             }`}
           >
             Questions ({questions.length})
+          </button>
+          <button
+            onClick={() => setTab('manual')}
+            className={`px-4 py-2 rounded font-medium transition-colors ${
+              tab === 'manual'
+                ? 'bg-[#c4a574] text-[#1a1410]'
+                : 'bg-[#2d261f] text-[#8b7355] hover:text-[#c4a574] border border-[#8b7355]/30'
+            }`}
+          >
+            Manual Whitelist
           </button>
         </div>
 
@@ -676,6 +723,63 @@ export default function AdminPage() {
                   Select an application to view details
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Manual Whitelist Tab */}
+        {tab === 'manual' && (
+          <div className="max-w-xl">
+            <div className="card">
+              <h2 className="font-['Special_Elite'] text-[#c4a574] uppercase tracking-wider mb-4">Manual Whitelist</h2>
+              <p className="text-[#8b7355] mb-6">
+                Whitelist a user by their Discord ID without requiring them to complete an application.
+                They will receive a DM notifying them of their whitelist status.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[#c4a574] text-sm mb-2">Discord User ID</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 123456789012345678"
+                    className="input w-full"
+                    value={manualDiscordId}
+                    onChange={(e) => setManualDiscordId(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleManualWhitelist()}
+                  />
+                  <p className="text-[#6b5a45] text-xs mt-1">
+                    Right-click the user in Discord and select "Copy User ID" (requires Developer Mode)
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleManualWhitelist}
+                  disabled={manualWhitelistLoading || !manualDiscordId.trim()}
+                  className="btn btn-success w-full"
+                >
+                  {manualWhitelistLoading ? 'Whitelisting...' : 'Whitelist User'}
+                </button>
+
+                {manualWhitelistResult && (
+                  <div className={`p-4 rounded border ${
+                    manualWhitelistResult.success
+                      ? 'bg-green-900/20 border-green-800/40 text-green-400'
+                      : 'bg-red-900/20 border-red-800/40 text-red-400'
+                  }`}>
+                    {manualWhitelistResult.message}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="card mt-6">
+              <h3 className="font-['Special_Elite'] text-[#c4a574] uppercase tracking-wider mb-3 text-sm">What happens when you whitelist someone manually?</h3>
+              <ul className="text-[#8b7355] text-sm space-y-2">
+                <li>1. The whitelist role is assigned to them in Discord</li>
+                <li>2. They receive a DM explaining they've been vouched for</li>
+                <li>3. The DM includes a link to the server rules</li>
+              </ul>
             </div>
           </div>
         )}
