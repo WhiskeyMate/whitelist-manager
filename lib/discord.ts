@@ -20,6 +20,11 @@ async function discordFetch(endpoint: string, options: RequestInit = {}) {
     throw new Error(`Discord API error: ${res.status}`)
   }
 
+  // Handle 204 No Content responses (e.g., role assignment/removal)
+  if (res.status === 204) {
+    return null
+  }
+
   return res.json()
 }
 
