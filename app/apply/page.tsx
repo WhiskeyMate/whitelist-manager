@@ -1,8 +1,8 @@
 'use client'
 
 import { useSession, signOut } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import Image from 'next/image'
 
 interface Question {
@@ -40,9 +40,21 @@ interface ExistingApp {
   }[]
 }
 
-export default function ApplyPage() {
+interface FormData {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  enabled: boolean
+  cooldownDays: number
+}
+
+function ApplyPageInner() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const formSlug = searchParams.get('form')
+
   const [questions, setQuestions] = useState<Question[]>([])
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [audioStates, setAudioStates] = useState<Record<string, AudioState>>({})
@@ -51,24 +63,28 @@ export default function ApplyPage() {
   const [error, setError] = useState('')
   const [existingApp, setExistingApp] = useState<ExistingApp | null>(null)
   const [inGuild, setInGuild] = useState<boolean | null>(null)
+  const [formInfo, setFormInfo] = useState<FormData | null>(null)
+  const [formError, setFormError] = useState('')
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
   const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
+  const formName = formInfo?.name || 'Whitelist'
+  const cooldownDays = formInfo?.cooldownDays ?? 7
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/')
-    } else if (session?.user?.isAdmin) {
+    } else if (session?.user?.isAdmin && !formSlug) {
       router.push('/admin')
     }
-  }, [status, session, router])
+  }, [status, session, router, formSlug])
 
   useEffect(() => {
     if (session?.user?.id) {
       fetchData()
     }
-  }, [session])
+  }, [session, formSlug])
 
   async function fetchData() {
     try {
@@ -77,31 +93,62 @@ export default function ApplyPage() {
       const guildData = await guildRes.json()
       setInGuild(guildData.inGuild)
 
-      // Check for existing application
-      const appRes = await fetch('/api/my-application')
+      // If this is a custom form, fetch form data
+      if (formSlug) {
+        const formRes = await fetch(`/api/forms/${formSlug}`)
+        if (!formRes.ok) {
+          const formData = await formRes.json()
+          setFormError(formData.error || 'Form not found')
+          setLoading(false)
+          return
+        }
+        const formData = await formRes.json()
+        setFormInfo(formData.form)
+
+        // Get questions from form data (already included)
+        setQuestions(formData.form.questions || [])
+
+        // Initialize audio states
+        const initialAudioStates: Record<string, AudioState> = {}
+        formData.form.questions?.forEach((q: Question) => {
+          if (q.type === 'audio') {
+            initialAudioStates[q.id] = {
+              isRecording: false,
+              audioBlob: null,
+              audioUrl: null,
+              uploadedFile: null,
+            }
+          }
+        })
+        setAudioStates(initialAudioStates)
+      } else {
+        // Default whitelist form
+        const questionsRes = await fetch('/api/questions')
+        const questionsData = await questionsRes.json()
+        setQuestions(questionsData.questions || [])
+
+        // Initialize audio states
+        const initialAudioStates: Record<string, AudioState> = {}
+        questionsData.questions?.forEach((q: Question) => {
+          if (q.type === 'audio') {
+            initialAudioStates[q.id] = {
+              isRecording: false,
+              audioBlob: null,
+              audioUrl: null,
+              uploadedFile: null,
+            }
+          }
+        })
+        setAudioStates(initialAudioStates)
+      }
+
+      // Check for existing application for this form
+      const appParam = formSlug ? `?form=${formSlug}` : ''
+      const appRes = await fetch(`/api/my-application${appParam}`)
       const appData = await appRes.json()
       if (appData.application) {
         setExistingApp(appData.application)
       }
-
-      // Get questions
-      const questionsRes = await fetch('/api/questions')
-      const questionsData = await questionsRes.json()
-      setQuestions(questionsData.questions || [])
-
-      // Initialize audio states
-      const initialAudioStates: Record<string, AudioState> = {}
-      questionsData.questions?.forEach((q: Question) => {
-        if (q.type === 'audio') {
-          initialAudioStates[q.id] = {
-            isRecording: false,
-            audioBlob: null,
-            audioUrl: null,
-            uploadedFile: null,
-          }
-        }
-      })
-      setAudioStates(initialAudioStates)
     } catch (e) {
       console.error('Failed to fetch data:', e)
       setError('Failed to load application form')
@@ -229,21 +276,26 @@ export default function ApplyPage() {
 
     try {
       // Prepare form data
-      const formData = new FormData()
-      formData.append('answers', JSON.stringify(answers))
+      const submitData = new window.FormData()
+      submitData.append('answers', JSON.stringify(answers))
+
+      // Include form slug if this is a custom form
+      if (formSlug) {
+        submitData.append('formSlug', formSlug)
+      }
 
       // Add audio files
       for (const [questionId, state] of Object.entries(audioStates)) {
         if (state.audioBlob) {
-          formData.append(`audio_${questionId}`, state.audioBlob, `${questionId}.webm`)
+          submitData.append(`audio_${questionId}`, state.audioBlob, `${questionId}.webm`)
         } else if (state.uploadedFile) {
-          formData.append(`audio_${questionId}`, state.uploadedFile)
+          submitData.append(`audio_${questionId}`, state.uploadedFile)
         }
       }
 
       const res = await fetch('/api/apply', {
         method: 'POST',
-        body: formData,
+        body: submitData,
       })
 
       const data = await res.json()
@@ -301,22 +353,27 @@ export default function ApplyPage() {
 
     try {
       // Prepare form data (only for revision questions)
-      const formData = new FormData()
-      formData.append('answers', JSON.stringify(answers))
+      const submitData = new window.FormData()
+      submitData.append('answers', JSON.stringify(answers))
+
+      // Include form slug if this is a custom form
+      if (formSlug) {
+        submitData.append('formSlug', formSlug)
+      }
 
       // Add audio files for revision questions
       for (const questionId of existingApp?.revisionQuestionIds || []) {
         const state = audioStates[questionId]
         if (state?.audioBlob) {
-          formData.append(`audio_${questionId}`, state.audioBlob, `${questionId}.webm`)
+          submitData.append(`audio_${questionId}`, state.audioBlob, `${questionId}.webm`)
         } else if (state?.uploadedFile) {
-          formData.append(`audio_${questionId}`, state.uploadedFile)
+          submitData.append(`audio_${questionId}`, state.uploadedFile)
         }
       }
 
       const res = await fetch('/api/apply/revision', {
         method: 'POST',
-        body: formData,
+        body: submitData,
       })
 
       const data = await res.json()
@@ -335,7 +392,7 @@ export default function ApplyPage() {
     }
   }
 
-  // Calculate if denied user can re-apply (7 days after denial)
+  // Calculate if denied user can re-apply
   function canReapply(): { allowed: boolean; daysRemaining: number } {
     if (!existingApp || existingApp.status !== 'denied') {
       return { allowed: false, daysRemaining: 0 }
@@ -343,16 +400,16 @@ export default function ApplyPage() {
 
     const reviewedAt = existingApp.reviewedAt ? new Date(existingApp.reviewedAt) : null
     if (!reviewedAt) {
-      return { allowed: false, daysRemaining: 7 }
+      return { allowed: false, daysRemaining: cooldownDays }
     }
 
     const now = new Date()
     const diffMs = now.getTime() - reviewedAt.getTime()
     const diffDays = diffMs / (1000 * 60 * 60 * 24)
-    const daysRemaining = Math.ceil(7 - diffDays)
+    const daysRemaining = Math.ceil(cooldownDays - diffDays)
 
     return {
-      allowed: diffDays >= 7,
+      allowed: diffDays >= cooldownDays,
       daysRemaining: Math.max(0, daysRemaining),
     }
   }
@@ -366,6 +423,31 @@ export default function ApplyPage() {
   }
 
   if (!session) return null
+
+  // Show error if form not found or closed
+  if (formError) {
+    return (
+      <main className="min-h-screen flex items-center justify-center p-4">
+        <div className="card max-w-md w-full text-center">
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/logo.png"
+              alt={serverName}
+              width={120}
+              height={120}
+              className="opacity-90"
+            />
+          </div>
+          <div className="text-[#c4a574] text-5xl mb-4">!</div>
+          <h1 className="text-2xl mb-4">Form Unavailable</h1>
+          <p className="text-[#8b7355] mb-6">{formError}</p>
+          <button onClick={() => signOut()} className="btn btn-primary">
+            Sign Out
+          </button>
+        </div>
+      </main>
+    )
+  }
 
   if (inGuild === false) {
     return (
@@ -441,7 +523,7 @@ export default function ApplyPage() {
 
             <h1 className="text-2xl text-center mb-2 text-amber-500">Revision Required</h1>
             <p className="text-[#8b7355] text-center mb-4 font-['Special_Elite'] tracking-wider uppercase text-sm">
-              Please update the following answers
+              {formName} &mdash; Please update the following answers
             </p>
 
             {existingApp.revisionReason && (
@@ -620,12 +702,12 @@ export default function ApplyPage() {
             )}
             <div className="text-left">
               <p className="font-medium text-[#d4c4a8]">{session.user.name}</p>
-              <p className="text-sm text-[#8b7355]">Application submitted</p>
+              <p className="text-sm text-[#8b7355]">{formName} application submitted</p>
             </div>
           </div>
 
           <div className="border-t-2 border-b-2 border-double border-[#8b7355] py-6 mb-6">
-            <h2 className="text-lg mb-2 text-[#8b7355] font-['Special_Elite'] tracking-wider uppercase">Application Status</h2>
+            <h2 className="text-lg mb-2 text-[#8b7355] font-['Special_Elite'] tracking-wider uppercase">{formName} Status</h2>
             <p className={`text-2xl font-semibold ${statusColors[existingApp.status]}`}>
               {statusLabels[existingApp.status]}
             </p>
@@ -693,7 +775,7 @@ export default function ApplyPage() {
               )}
               <div>
                 <p className="font-medium text-[#d4c4a8]">{session.user.name}</p>
-                <p className="text-sm text-[#8b7355]">Applying for whitelist</p>
+                <p className="text-sm text-[#8b7355]">Applying for {formName.toLowerCase()}</p>
               </div>
             </div>
             <button onClick={() => signOut()} className="text-sm text-[#8b7355] hover:text-[#c4a574] transition-colors">
@@ -715,9 +797,13 @@ export default function ApplyPage() {
           </div>
 
           <h1 className="text-2xl text-center mb-2">{serverName}</h1>
-          <p className="text-[#8b7355] text-center mb-8 font-['Special_Elite'] tracking-wider uppercase text-sm">
-            Whitelist Application
+          <p className="text-[#8b7355] text-center mb-4 font-['Special_Elite'] tracking-wider uppercase text-sm">
+            {formName} Application
           </p>
+
+          {formInfo?.description && (
+            <p className="text-[#d4c4a8] text-center mb-4 text-sm">{formInfo.description}</p>
+          )}
 
           <div className="border-t-2 border-b-2 border-double border-[#8b7355] py-4 mb-8">
             <p className="text-[#d4c4a8] text-center leading-relaxed">
@@ -836,5 +922,17 @@ export default function ApplyPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function ApplyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#c4a574]"></div>
+      </div>
+    }>
+      <ApplyPageInner />
+    </Suspense>
   )
 }

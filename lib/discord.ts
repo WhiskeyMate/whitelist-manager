@@ -37,10 +37,19 @@ export async function isUserInGuild(userId: string): Promise<boolean> {
   }
 }
 
-export async function assignWhitelistRole(userId: string): Promise<boolean> {
+export async function getUserRoles(userId: string): Promise<string[]> {
+  try {
+    const member = await discordFetch(`/guilds/${DISCORD_GUILD_ID}/members/${userId}`)
+    return member?.roles || []
+  } catch {
+    return []
+  }
+}
+
+export async function assignRole(userId: string, roleId: string): Promise<boolean> {
   try {
     await discordFetch(
-      `/guilds/${DISCORD_GUILD_ID}/members/${userId}/roles/${DISCORD_WHITELIST_ROLE_ID}`,
+      `/guilds/${DISCORD_GUILD_ID}/members/${userId}/roles/${roleId}`,
       { method: 'PUT' }
     )
     return true
@@ -50,10 +59,10 @@ export async function assignWhitelistRole(userId: string): Promise<boolean> {
   }
 }
 
-export async function removeWhitelistRole(userId: string): Promise<boolean> {
+export async function removeRole(userId: string, roleId: string): Promise<boolean> {
   try {
     await discordFetch(
-      `/guilds/${DISCORD_GUILD_ID}/members/${userId}/roles/${DISCORD_WHITELIST_ROLE_ID}`,
+      `/guilds/${DISCORD_GUILD_ID}/members/${userId}/roles/${roleId}`,
       { method: 'DELETE' }
     )
     return true
@@ -61,6 +70,14 @@ export async function removeWhitelistRole(userId: string): Promise<boolean> {
     console.error('Failed to remove role:', e)
     return false
   }
+}
+
+export async function assignWhitelistRole(userId: string): Promise<boolean> {
+  return assignRole(userId, DISCORD_WHITELIST_ROLE_ID)
+}
+
+export async function removeWhitelistRole(userId: string): Promise<boolean> {
+  return removeRole(userId, DISCORD_WHITELIST_ROLE_ID)
 }
 
 export async function sendDM(userId: string, message: string): Promise<boolean> {

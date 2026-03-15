@@ -7,12 +7,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Form {
+  id             String        @id @default(cuid())
+  name           String        // Display name, e.g. "Staff Application"
+  slug           String        @unique // URL-safe identifier, e.g. "staff-app"
+  description    String?
+  enabled        Boolean       @default(true)
+  roleId         String?       // Discord role to assign on approval (optional)
+  webhookUrl     String?       // Webhook for notifications (fallback: STAFF_WEBHOOK_URL)
+  reviewerRoleId String?       // Discord role ID that can review this form's apps
+  cooldownDays   Int           @default(7)
+  questions      Question[]
+  applications   Application[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
 model Application {
   id              String   @id @default(cuid())
   discordId       String
   discordName     String
   discordAvatar   String?
   status          String   @default("pending") // pending, approved, denied, revision
+  formId          String?
+  form            Form?    @relation(fields: [formId], references: [id])
   answers         Answer[]
   denialReason    String?
   revisionReason  String?  // Reason for requesting revision
@@ -23,6 +41,8 @@ model Application {
   reviewedAt      DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([discordId, formId])
 }
 
 model Answer {
@@ -42,7 +62,11 @@ model Question {
   type        String   // text, textarea, audio
   required    Boolean  @default(true)
   order       Int      @default(0)
+  formId      String?
+  form        Form?    @relation(fields: [formId], references: [id])
   answers     Answer[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([formId, order])
 }

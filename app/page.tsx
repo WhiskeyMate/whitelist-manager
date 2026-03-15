@@ -12,7 +12,8 @@ export default function Home() {
 
   useEffect(() => {
     if (session) {
-      if (session.user.isAdmin) {
+      // Admin or users with roles (potential reviewers) go to admin dashboard
+      if (session.user.isAdmin || (session.user.roles && session.user.roles.length > 0)) {
         router.push('/admin')
       } else {
         router.push('/apply')

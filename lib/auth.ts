@@ -1,7 +1,8 @@
 import { NextAuthOptions } from 'next-auth'
 import DiscordProvider from 'next-auth/providers/discord'
+import { getUserRoles } from './discord'
 
-const ADMIN_IDS = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim())
+const ADMIN_ROLE_IDS = (process.env.ADMIN_ROLE_IDS || '').split(',').map(id => id.trim()).filter(Boolean)
 
 interface DiscordProfile {
   id: string
@@ -28,7 +29,10 @@ export const authOptions: NextAuthOptions = {
       if (account && profile) {
         const discordProfile = profile as DiscordProfile
         token.id = discordProfile.id
-        token.isAdmin = ADMIN_IDS.includes(discordProfile.id)
+        // Fetch user's Discord roles via the bot API
+        const roles = await getUserRoles(discordProfile.id)
+        token.roles = roles
+        token.isAdmin = roles.some(r => ADMIN_ROLE_IDS.includes(r))
       }
       return token
     },
@@ -36,6 +40,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).id = token.id
         ;(session.user as any).isAdmin = token.isAdmin
+        ;(session.user as any).roles = token.roles || []
       }
       return session
     },

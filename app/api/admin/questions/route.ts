@@ -11,11 +11,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { text, type, required } = await req.json()
+    const { text, type, required, formId } = await req.json()
 
-    // Get max order
+    // Get max order for questions in this form
     const maxOrder = await prisma.question.aggregate({
       _max: { order: true },
+      where: { formId: formId || null },
     })
 
     const question = await prisma.question.create({
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
         type,
         required: required ?? true,
         order: (maxOrder._max.order ?? -1) + 1,
+        formId: formId || null,
       },
     })
 

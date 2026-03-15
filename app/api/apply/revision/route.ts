@@ -14,13 +14,22 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData()
     const answersJson = formData.get('answers') as string
+    const formSlug = formData.get('formSlug') as string | null
     const textAnswers = JSON.parse(answersJson || '{}')
 
-    // Find the user's application in revision status
+    // Resolve formId from slug
+    let formId: string | null = null
+    if (formSlug) {
+      const form = await prisma.form.findUnique({ where: { slug: formSlug } })
+      formId = form?.id || null
+    }
+
+    // Find the user's application in revision status for this form
     const application = await prisma.application.findFirst({
       where: {
         discordId: (session.user as any).id,
         status: 'revision',
+        formId,
       },
       include: {
         answers: true,

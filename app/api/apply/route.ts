@@ -15,24 +15,43 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Check for existing pending application
+    const formData = await req.formData()
+    const answersJson = formData.get('answers') as string
+    const formSlug = formData.get('formSlug') as string | null
+    const textAnswers = JSON.parse(answersJson || '{}')
+
+    // Resolve form if slug provided
+    let formId: string | null = null
+    let formRecord: any = null
+
+    if (formSlug) {
+      formRecord = await prisma.form.findUnique({ where: { slug: formSlug } })
+      if (!formRecord) {
+        return NextResponse.json({ error: 'Form not found' }, { status: 404 })
+      }
+      if (!formRecord.enabled) {
+        return NextResponse.json({ error: 'This form is currently closed' }, { status: 400 })
+      }
+      formId = formRecord.id
+    }
+
+    // Check for existing pending or revision application for this form
     const existingApp = await prisma.application.findFirst({
       where: {
         discordId: session.user.id,
-        status: 'pending',
+        formId,
+        status: { in: ['pending', 'revision'] },
       },
     })
 
     if (existingApp) {
-      return NextResponse.json({ error: 'You already have a pending application' }, { status: 400 })
+      return NextResponse.json({ error: 'You already have a pending application for this form' }, { status: 400 })
     }
 
-    const formData = await req.formData()
-    const answersJson = formData.get('answers') as string
-    const textAnswers = JSON.parse(answersJson || '{}')
-
-    // Get all questions
-    const questions = await prisma.question.findMany()
+    // Get questions for this form
+    const questions = await prisma.question.findMany({
+      where: { formId },
+    })
 
     // Create application
     const application = await prisma.application.create({
@@ -40,6 +59,7 @@ export async function POST(req: NextRequest) {
         discordId: session.user.id,
         discordName: session.user.name || 'Unknown',
         discordAvatar: session.user.image?.split('/').pop()?.split('.')[0] || null,
+        formId,
       },
     })
 
@@ -80,13 +100,15 @@ export async function POST(req: NextRequest) {
     })
 
     // Send webhook notification to staff
-    if (STAFF_WEBHOOK_URL) {
-      const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
-      const appUrl = process.env.NEXTAUTH_URL || 'https://whitelist.rosalitarp.com'
+    const webhookUrl = formRecord?.webhookUrl || STAFF_WEBHOOK_URL
+    const formName = formRecord?.name || 'Whitelist'
 
-      await sendWebhook(STAFF_WEBHOOK_URL, {
-        title: 'New Whitelist Application',
-        description: `**${session.user.name}** has submitted a whitelist application.`,
+    if (webhookUrl) {
+      const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
+
+      await sendWebhook(webhookUrl, {
+        title: `New ${formName} Application`,
+        description: `**${session.user.name}** has submitted a ${formName.toLowerCase()} application.`,
         color: 0xc4a574, // Western gold color
         thumbnail: {
           url: session.user.image || `https://cdn.discordapp.com/embed/avatars/0.png`,
