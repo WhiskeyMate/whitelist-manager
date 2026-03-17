@@ -1,6 +1,7 @@
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN!
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID!
 const DISCORD_WHITELIST_ROLE_ID = process.env.DISCORD_WHITELIST_ROLE_ID!
+const DISCORD_ROLE_TO_REMOVE_ON_WHITELIST = '1439609608137080924'
 
 const DISCORD_API = 'https://discord.com/api/v10'
 
@@ -48,10 +49,23 @@ export async function getUserRoles(userId: string): Promise<string[]> {
 
 export async function assignRole(userId: string, roleId: string): Promise<boolean> {
   try {
+    // Assign the whitelist role
     await discordFetch(
       `/guilds/${DISCORD_GUILD_ID}/members/${userId}/roles/${roleId}`,
       { method: 'PUT' }
     )
+
+    // Remove the pre-whitelist role
+    try {
+      await discordFetch(
+        `/guilds/${DISCORD_GUILD_ID}/members/${userId}/roles/${DISCORD_ROLE_TO_REMOVE_ON_WHITELIST}`,
+        { method: 'DELETE' }
+      )
+    } catch (e) {
+      // Log but don't fail if role removal fails (user may not have it)
+      console.warn('Could not remove pre-whitelist role:', e)
+    }
+
     return true
   } catch (e) {
     console.error('Failed to assign role:', e)
