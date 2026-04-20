@@ -1226,7 +1226,7 @@ export default function AdminPage() {
         )}
 
         {/* Manual Whitelist Tab */}
-        {tab === 'manual' && isAdmin && (
+        {tab === 'manual' && canManualWhitelist && (
           <div className="max-w-xl">
             <div className="card">
               <h2 className="font-['Special_Elite'] text-[#c4a574] uppercase tracking-wider mb-4">Manual Whitelist</h2>
