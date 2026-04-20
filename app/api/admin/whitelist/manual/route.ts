@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { assignWhitelistRole, sendEmbedDM } from '@/lib/discord'
+import { canReviewWhitelist } from '@/lib/permissions'
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
 
-  if (!session?.user?.isAdmin) {
+  const userRoles = session?.user?.roles || []
+  if (!session?.user?.isAdmin && !canReviewWhitelist(userRoles)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
