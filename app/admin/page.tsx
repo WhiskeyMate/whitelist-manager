@@ -123,6 +123,7 @@ export default function AdminPage() {
 
   const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
   const isAdmin = session?.user?.isAdmin ?? false
+  const canManualWhitelist = session?.user?.canManualWhitelist ?? false
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -645,28 +646,28 @@ export default function AdminPage() {
             Questions ({questions.length})
           </button>
           {isAdmin && (
-            <>
-              <button
-                onClick={() => setTab('forms')}
-                className={`px-4 py-2 rounded font-medium transition-colors ${
-                  tab === 'forms'
-                    ? 'bg-[#c4a574] text-[#1a1410]'
-                    : 'bg-[#2d261f] text-[#8b7355] hover:text-[#c4a574] border border-[#8b7355]/30'
-                }`}
-              >
-                Forms ({forms.length})
-              </button>
-              <button
-                onClick={() => setTab('manual')}
-                className={`px-4 py-2 rounded font-medium transition-colors ${
-                  tab === 'manual'
-                    ? 'bg-[#c4a574] text-[#1a1410]'
-                    : 'bg-[#2d261f] text-[#8b7355] hover:text-[#c4a574] border border-[#8b7355]/30'
-                }`}
-              >
-                Manual Whitelist
-              </button>
-            </>
+            <button
+              onClick={() => setTab('forms')}
+              className={`px-4 py-2 rounded font-medium transition-colors ${
+                tab === 'forms'
+                  ? 'bg-[#c4a574] text-[#1a1410]'
+                  : 'bg-[#2d261f] text-[#8b7355] hover:text-[#c4a574] border border-[#8b7355]/30'
+              }`}
+            >
+              Forms ({forms.length})
+            </button>
+          )}
+          {canManualWhitelist && (
+            <button
+              onClick={() => setTab('manual')}
+              className={`px-4 py-2 rounded font-medium transition-colors ${
+                tab === 'manual'
+                  ? 'bg-[#c4a574] text-[#1a1410]'
+                  : 'bg-[#2d261f] text-[#8b7355] hover:text-[#c4a574] border border-[#8b7355]/30'
+              }`}
+            >
+              Manual Whitelist
+            </button>
           )}
         </div>
 
