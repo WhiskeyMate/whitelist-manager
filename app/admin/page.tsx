@@ -121,6 +121,10 @@ export default function AdminPage() {
   const [formError, setFormError] = useState('')
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
 
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'revision' | 'approved' | 'denied'>('all')
+
   const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
   const isAdmin = session?.user?.isAdmin ?? false
   const canManualWhitelist = session?.user?.canManualWhitelist ?? false
@@ -551,9 +555,23 @@ export default function AdminPage() {
 
   if (!session) return null
 
-  const pendingApps = applications.filter(a => a.status === 'pending')
-  const revisionApps = applications.filter(a => a.status === 'revision')
-  const processedApps = applications.filter(a => a.status !== 'pending' && a.status !== 'revision')
+  const searchLower = searchQuery.toLowerCase()
+  const filtered = applications.filter(a =>
+    !searchQuery || a.discordName.toLowerCase().includes(searchLower)
+  )
+
+  const pendingApps = filtered.filter(a => a.status === 'pending')
+  const revisionApps = filtered.filter(a => a.status === 'revision')
+  const approvedApps = filtered.filter(a => a.status === 'approved')
+  const deniedApps = filtered.filter(a => a.status === 'denied')
+  const processedApps = filtered.filter(a => a.status !== 'pending' && a.status !== 'revision')
+
+  const showPending = statusFilter === 'all' || statusFilter === 'pending'
+  const showRevision = statusFilter === 'all' || statusFilter === 'revision'
+  const showProcessed = statusFilter === 'all' || statusFilter === 'approved' || statusFilter === 'denied'
+  const visibleProcessedApps = statusFilter === 'approved' ? approvedApps
+    : statusFilter === 'denied' ? deniedApps
+    : processedApps
 
   const selectedFormName = selectedFormId
     ? forms.find(f => f.id === selectedFormId)?.name || 'Custom Form'
@@ -675,9 +693,31 @@ export default function AdminPage() {
         {tab === 'applications' && (
           <>
             <FormSelector />
+            <div className="flex gap-3 mb-6">
+              <input
+                type="text"
+                placeholder="Search by username..."
+                className="input flex-1 max-w-xs"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <select
+                className="input max-w-[10rem]"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              >
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="revision">Revision</option>
+                <option value="approved">Approved</option>
+                <option value="denied">Denied</option>
+              </select>
+            </div>
             <div className="grid lg:grid-cols-3 gap-6">
               {/* Applications List */}
               <div className="lg:col-span-1 space-y-4 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pr-2">
+                {showPending && (
+                <>
                 <h2 className="font-['Special_Elite'] text-[#c4a574] uppercase tracking-wider text-sm">Pending</h2>
                 {pendingApps.length === 0 ? (
                   <p className="text-[#6b5a45] text-sm">No pending applications</p>
@@ -714,9 +754,11 @@ export default function AdminPage() {
                     </div>
                   ))
                 )}
+                </>
+                )}
 
                 {/* Revision section */}
-                {revisionApps.length > 0 && (
+                {showRevision && revisionApps.length > 0 && (
                   <>
                     <h2 className="font-['Special_Elite'] text-amber-500 uppercase tracking-wider text-sm mt-8">Awaiting Revision</h2>
                     {revisionApps.map(app => (
@@ -753,8 +795,10 @@ export default function AdminPage() {
                   </>
                 )}
 
+                {showProcessed && (
+                <>
                 <h2 className="font-['Special_Elite'] text-[#c4a574] uppercase tracking-wider text-sm mt-8">Processed</h2>
-                {processedApps.map(app => (
+                {visibleProcessedApps.map(app => (
                   <div
                     key={app.id}
                     onClick={() => setSelectedApp(app)}
@@ -788,6 +832,8 @@ export default function AdminPage() {
                     </div>
                   </div>
                 ))}
+                </>
+                )}
               </div>
 
               {/* Application Detail */}
