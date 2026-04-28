@@ -136,19 +136,19 @@ export default function AdminPage() {
       // Non-admin: check if they have access via reviewer roles
       // We'll verify after forms load — if they have no access, redirect
     }
-  }, [session])
+  }, [session?.user?.isAdmin])
 
   useEffect(() => {
     if (session?.user?.id) {
       fetchForms()
     }
-  }, [session])
+  }, [session?.user?.id])
 
   useEffect(() => {
     if (session?.user?.id) {
       fetchApplicationsAndQuestions()
     }
-  }, [session, selectedFormId])
+  }, [session?.user?.id, selectedFormId])
 
   // Reset revision checkboxes when selecting a different application
   useEffect(() => {
@@ -676,7 +676,7 @@ export default function AdminPage() {
             <FormSelector />
             <div className="grid lg:grid-cols-3 gap-6">
               {/* Applications List */}
-              <div className="lg:col-span-1 space-y-4">
+              <div className="lg:col-span-1 space-y-4 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pr-2">
                 <h2 className="font-['Special_Elite'] text-[#c4a574] uppercase tracking-wider text-sm">Pending</h2>
                 {pendingApps.length === 0 ? (
                   <p className="text-[#6b5a45] text-sm">No pending applications</p>
@@ -753,7 +753,7 @@ export default function AdminPage() {
                 )}
 
                 <h2 className="font-['Special_Elite'] text-[#c4a574] uppercase tracking-wider text-sm mt-8">Processed</h2>
-                {processedApps.slice(0, 10).map(app => (
+                {processedApps.map(app => (
                   <div
                     key={app.id}
                     onClick={() => setSelectedApp(app)}
@@ -790,7 +790,7 @@ export default function AdminPage() {
               </div>
 
               {/* Application Detail */}
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-2 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto">
                 {selectedApp ? (
                   <div className="card">
                     <div className="flex items-center justify-between mb-6 pb-6 border-b border-[#8b7355]/30">

@@ -78,13 +78,13 @@ function ApplyPageInner() {
     } else if (session?.user?.isAdmin && !formSlug) {
       router.push('/admin')
     }
-  }, [status, session, router, formSlug])
+  }, [status, session?.user?.isAdmin, router, formSlug])
 
   useEffect(() => {
     if (session?.user?.id) {
       fetchData()
     }
-  }, [session, formSlug])
+  }, [session?.user?.id, formSlug])
 
   async function fetchData() {
     try {
@@ -108,38 +108,42 @@ function ApplyPageInner() {
         // Get questions from form data (already included)
         setQuestions(formData.form.questions || [])
 
-        // Initialize audio states
-        const initialAudioStates: Record<string, AudioState> = {}
-        formData.form.questions?.forEach((q: Question) => {
-          if (q.type === 'audio') {
-            initialAudioStates[q.id] = {
-              isRecording: false,
-              audioBlob: null,
-              audioUrl: null,
-              uploadedFile: null,
+        // Initialize audio states only for questions that don't already have state
+        setAudioStates(prev => {
+          const updated = { ...prev }
+          formData.form.questions?.forEach((q: Question) => {
+            if (q.type === 'audio' && !updated[q.id]) {
+              updated[q.id] = {
+                isRecording: false,
+                audioBlob: null,
+                audioUrl: null,
+                uploadedFile: null,
+              }
             }
-          }
+          })
+          return updated
         })
-        setAudioStates(initialAudioStates)
       } else {
         // Default whitelist form
         const questionsRes = await fetch('/api/questions')
         const questionsData = await questionsRes.json()
         setQuestions(questionsData.questions || [])
 
-        // Initialize audio states
-        const initialAudioStates: Record<string, AudioState> = {}
-        questionsData.questions?.forEach((q: Question) => {
-          if (q.type === 'audio') {
-            initialAudioStates[q.id] = {
-              isRecording: false,
-              audioBlob: null,
-              audioUrl: null,
-              uploadedFile: null,
+        // Initialize audio states only for questions that don't already have state
+        setAudioStates(prev => {
+          const updated = { ...prev }
+          questionsData.questions?.forEach((q: Question) => {
+            if (q.type === 'audio' && !updated[q.id]) {
+              updated[q.id] = {
+                isRecording: false,
+                audioBlob: null,
+                audioUrl: null,
+                uploadedFile: null,
+              }
             }
-          }
+          })
+          return updated
         })
-        setAudioStates(initialAudioStates)
       }
 
       // Check for existing application for this form
