@@ -9,6 +9,7 @@ declare module 'next-auth' {
       image?: string | null
       isAdmin: boolean
       roles: string[]
+      canManualWhitelist: boolean
     }
   }
 }
@@ -18,5 +19,6 @@ declare module 'next-auth/jwt' {
     id: string
     isAdmin: boolean
     roles: string[]
+    canManualWhitelist: boolean
   }
 }
