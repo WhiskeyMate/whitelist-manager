@@ -80,6 +80,8 @@ export async function PUT(
     })
 
     // Handle Discord actions
+    let dmSent = true
+
     if (status === 'approved') {
       // Assign role if configured
       if (roleId) {
@@ -87,7 +89,7 @@ export async function PUT(
       }
 
       // Send approval DM
-      await sendEmbedDM(application.discordId, {
+      dmSent = await sendEmbedDM(application.discordId, {
         title: `${formName} Application Approved!`,
         description: `Congratulations! Your **${formName}** application to **${serverName}** has been approved.`,
         color: 0x22c55e,
@@ -100,7 +102,7 @@ export async function PUT(
       }
 
       // Send denial DM
-      await sendEmbedDM(application.discordId, {
+      dmSent = await sendEmbedDM(application.discordId, {
         title: `${formName} Application Denied`,
         description: denialReason
           ? `Unfortunately, your **${formName}** application to **${serverName}** was not approved.\n\n**Reason:** ${denialReason}\n\nYou may re-apply after ${cooldownDays} days.`
@@ -121,7 +123,7 @@ export async function PUT(
         : `${appUrl}/apply`
 
       // Send revision DM
-      await sendEmbedDM(application.discordId, {
+      dmSent = await sendEmbedDM(application.discordId, {
         title: `${formName} Application Revision Requested`,
         description: `Your **${formName}** application to **${serverName}** requires revision.\n\n**Reason:** ${revisionReason || 'Please review and update your answers.'}\n\n**Questions to revise:**\n${questionTexts}\n\n[Click here to submit your revised answers](${applyUrl})`,
         color: 0xf59e0b,
@@ -129,7 +131,7 @@ export async function PUT(
       })
     }
 
-    return NextResponse.json({ application: updatedApp })
+    return NextResponse.json({ application: updatedApp, dmSent })
   } catch (error) {
     console.error('Failed to update application:', error)
     return NextResponse.json({ error: 'Failed to update application' }, { status: 500 })

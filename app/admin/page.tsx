@@ -211,6 +211,10 @@ export default function AdminPage() {
     }
   }
 
+  function warnDmFailed() {
+    alert('Warning: The action was completed, but the DM could not be delivered. The user may have DMs disabled.')
+  }
+
   async function handleApprove(appId: string) {
     setProcessing(true)
     try {
@@ -223,6 +227,7 @@ export default function AdminPage() {
         const data = await res.json()
         setApplications(prev => prev.map(a => a.id === appId ? { ...a, ...data.application } : a))
         setSelectedApp(prev => prev?.id === appId ? { ...prev, ...data.application } : prev)
+        if (data.dmSent === false) warnDmFailed()
       }
     } catch (e) {
       console.error('Failed to approve:', e)
@@ -245,6 +250,7 @@ export default function AdminPage() {
         setSelectedApp(prev => prev?.id === appId ? { ...prev, ...data.application } : prev)
         setShowDenialModal(false)
         setDenialReason('')
+        if (data.dmSent === false) warnDmFailed()
       }
     } catch (e) {
       console.error('Failed to deny:', e)
@@ -276,6 +282,7 @@ export default function AdminPage() {
         setShowRevisionModal(false)
         setRevisionReason('')
         setRevisionQuestionIds([])
+        if (data.dmSent === false) warnDmFailed()
       }
     } catch (e) {
       console.error('Failed to send revision:', e)
