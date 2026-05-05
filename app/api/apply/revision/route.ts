@@ -43,6 +43,8 @@ export async function POST(req: NextRequest) {
     // Update answers for the revision questions
     const revisionQuestionIds = application.revisionQuestionIds as string[]
     for (const questionId of revisionQuestionIds) {
+      const existing = application.answers.find(a => a.questionId === questionId)
+
       // Check if there's a text answer
       if (textAnswers[questionId]) {
         await prisma.answer.updateMany({
@@ -52,6 +54,7 @@ export async function POST(req: NextRequest) {
           },
           data: {
             textAnswer: textAnswers[questionId],
+            previousTextAnswer: existing?.textAnswer ?? null,
           },
         })
       }
@@ -70,6 +73,7 @@ export async function POST(req: NextRequest) {
           },
           data: {
             audioUrl,
+            previousAudioUrl: existing?.audioUrl ?? null,
           },
         })
       }

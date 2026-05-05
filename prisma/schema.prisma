@@ -53,6 +53,8 @@ model Answer {
   question      Question    @relation(fields: [questionId], references: [id])
   textAnswer    String?
   audioUrl      String?
+  previousTextAnswer String?
+  previousAudioUrl   String?
   createdAt     DateTime    @default(now())
 }
 

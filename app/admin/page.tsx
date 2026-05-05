@@ -24,6 +24,8 @@ interface Application {
     id: string
     textAnswer: string | null
     audioUrl: string | null
+    previousTextAnswer: string | null
+    previousAudioUrl: string | null
     question: {
       id: string
       text: string
@@ -931,6 +933,22 @@ export default function AdminPage() {
                                     </span>
                                   )}
                                 </p>
+                                {wasRevised && (answer.previousTextAnswer || answer.previousAudioUrl) && (
+                                  <div className="mb-3 border-l-2 border-[#8b7355]/40 pl-3">
+                                    <p className="text-xs uppercase tracking-wide text-[#8b7355] mb-1">Previous answer</p>
+                                    {answer.previousTextAnswer && (
+                                      <p className="text-[#8b7355] whitespace-pre-wrap line-through decoration-[#8b7355]/40">
+                                        {linkifyText(answer.previousTextAnswer)}
+                                      </p>
+                                    )}
+                                    {answer.previousAudioUrl && (
+                                      <audio src={answer.previousAudioUrl} controls className="w-full mt-2 opacity-60" />
+                                    )}
+                                  </div>
+                                )}
+                                {wasRevised && (answer.textAnswer || answer.audioUrl) && (
+                                  <p className="text-xs uppercase tracking-wide text-amber-500 mb-1">Revised answer</p>
+                                )}
                                 {answer.textAnswer && (
                                   <p className="text-[#d4c4a8] whitespace-pre-wrap">
                                     {linkifyText(answer.textAnswer)}
