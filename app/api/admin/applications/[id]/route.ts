@@ -73,10 +73,33 @@ export async function PUT(
       updateData.revisedQuestionIds = []
     }
 
-    // Update application with reviewer info
-    const updatedApp = await prisma.application.update({
-      where: { id: appId },
+    // Atomic status precondition: only transition from pending/revision.
+    // Once an application is approved or denied, it can't be flipped again
+    // (closes the race where one reviewer denies while another requests revision).
+    const result = await prisma.application.updateMany({
+      where: {
+        id: appId,
+        status: { in: ['pending', 'revision'] },
+      },
       data: updateData,
+    })
+
+    if (result.count === 0) {
+      const currentApp = await prisma.application.findUnique({
+        where: { id: appId },
+        include: {
+          answers: { include: { question: true } },
+          form: { select: { id: true, name: true, slug: true } },
+        },
+      })
+      return NextResponse.json({
+        error: `This application has already been ${currentApp?.status || 'processed'}${currentApp?.reviewedBy ? ` by ${currentApp.reviewedBy}` : ''}.`,
+        application: currentApp,
+      }, { status: 409 })
+    }
+
+    const updatedApp = await prisma.application.findUnique({
+      where: { id: appId },
     })
 
     // Handle Discord actions

@@ -162,6 +162,49 @@ export default function AdminPage() {
     setRevisionQuestionIds([])
   }, [selectedApp?.id])
 
+  // Quiet refresh: replace applications list and sync selectedApp without UI flicker
+  const refreshApplicationsQuietly = useCallback(async () => {
+    if (!session?.user?.id) return
+    try {
+      const formParam = selectedFormId ? `?formId=${selectedFormId}` : ''
+      const res = await fetch(`/api/admin/applications${formParam}`)
+      if (!res.ok) return
+      const data = await res.json()
+      const fresh: Application[] = data.applications || []
+      setApplications(fresh)
+      setSelectedApp(prev => {
+        if (!prev) return prev
+        const match = fresh.find(a => a.id === prev.id)
+        return match ?? prev
+      })
+    } catch (e) {
+      console.error('Failed to refresh applications:', e)
+    }
+  }, [session?.user?.id, selectedFormId])
+
+  // Poll the applications list while the Applications tab is visible so all
+  // reviewers see status changes in near real time.
+  useEffect(() => {
+    if (tab !== 'applications' || !session?.user?.id) return
+
+    const POLL_MS = 5000
+    const timer = setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        refreshApplicationsQuietly()
+      }
+    }, POLL_MS)
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refreshApplicationsQuietly()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [tab, session?.user?.id, refreshApplicationsQuietly])
+
   async function fetchForms() {
     try {
       const res = await fetch('/api/admin/forms')
@@ -217,6 +260,18 @@ export default function AdminPage() {
     alert('Warning: The action was completed, but the DM could not be delivered. The user may have DMs disabled.')
   }
 
+  // If the server rejects an action because the app was already processed
+  // by another reviewer, sync our state from the conflict response and warn.
+  function handleConflict(appId: string, data: any) {
+    alert(data?.error || 'This application has already been processed by another reviewer.')
+    if (data?.application) {
+      setApplications(prev => prev.map(a => a.id === appId ? { ...a, ...data.application } : a))
+      setSelectedApp(prev => prev?.id === appId ? { ...prev, ...data.application } : prev)
+    } else {
+      refreshApplicationsQuietly()
+    }
+  }
+
   async function handleApprove(appId: string) {
     setProcessing(true)
     try {
@@ -225,6 +280,10 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'approved' }),
       })
+      if (res.status === 409) {
+        handleConflict(appId, await res.json())
+        return
+      }
       if (res.ok) {
         const data = await res.json()
         setApplications(prev => prev.map(a => a.id === appId ? { ...a, ...data.application } : a))
@@ -246,6 +305,12 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'denied', denialReason }),
       })
+      if (res.status === 409) {
+        handleConflict(appId, await res.json())
+        setShowDenialModal(false)
+        setDenialReason('')
+        return
+      }
       if (res.ok) {
         const data = await res.json()
         setApplications(prev => prev.map(a => a.id === appId ? { ...a, ...data.application } : a))
@@ -277,6 +342,13 @@ export default function AdminPage() {
           revisionQuestionIds,
         }),
       })
+      if (res.status === 409) {
+        handleConflict(appId, await res.json())
+        setShowRevisionModal(false)
+        setRevisionReason('')
+        setRevisionQuestionIds([])
+        return
+      }
       if (res.ok) {
         const data = await res.json()
         setApplications(prev => prev.map(a => a.id === appId ? { ...a, ...data.application } : a))
