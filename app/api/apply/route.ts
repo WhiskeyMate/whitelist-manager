@@ -48,6 +48,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'You already have a pending application for this form' }, { status: 400 })
     }
 
+    // Enforce escalating denial cooldown
+    const lastDenied = await prisma.application.findFirst({
+      where: {
+        discordId: session.user.id,
+        formId,
+        status: 'denied',
+      },
+      orderBy: { reviewedAt: 'desc' },
+      select: { reviewedAt: true },
+    })
+
+    if (lastDenied?.reviewedAt) {
+      const denialCount = await prisma.application.count({
+        where: {
+          discordId: session.user.id,
+          formId,
+          status: 'denied',
+        },
+      })
+      const cooldownDays = denialCount <= 1 ? 3 : denialCount === 2 ? 5 : 7
+      const diffMs = Date.now() - lastDenied.reviewedAt.getTime()
+      const diffDays = diffMs / (1000 * 60 * 60 * 24)
+
+      if (diffDays < cooldownDays) {
+        const daysRemaining = Math.ceil(cooldownDays - diffDays)
+        return NextResponse.json(
+          { error: `You must wait ${daysRemaining} more day${daysRemaining !== 1 ? 's' : ''} before re-applying` },
+          { status: 400 }
+        )
+      }
+    }
+
     // Get questions for this form
     const questions = await prisma.question.findMany({
       where: { formId },

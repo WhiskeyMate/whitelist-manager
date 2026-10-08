@@ -2,13 +2,18 @@
 
 import { useSession, signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 
 export default function Home() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
+  const [authError, setAuthError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setAuthError(new URLSearchParams(window.location.search).get('error'))
+  }, [])
 
   useEffect(() => {
     if (session) {
@@ -56,8 +61,16 @@ export default function Home() {
           </p>
         </div>
 
+        {authError && (
+          <p className="text-red-400 mb-4 text-sm">
+            {authError === 'AccessDenied'
+              ? 'Sign in was cancelled or denied.'
+              : `Discord sign in failed (${authError}). Please try again in a minute.`}
+          </p>
+        )}
+
         <button
-          onClick={() => signIn('discord')}
+          onClick={() => signIn('discord', { callbackUrl: '/' })}
           className="btn btn-discord w-full flex items-center justify-center gap-3"
         >
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">

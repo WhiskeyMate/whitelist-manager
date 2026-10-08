@@ -35,7 +35,17 @@ export async function GET(req: NextRequest) {
         }
       }
     })
-    return NextResponse.json({ application })
+
+    // Count total denials for this user+form for escalating cooldowns
+    const denialCount = await prisma.application.count({
+      where: {
+        discordId: session.user.id,
+        formId,
+        status: 'denied',
+      },
+    })
+
+    return NextResponse.json({ application, denialCount })
   } catch (error) {
     console.error('Failed to fetch application:', error)
     return NextResponse.json({ error: 'Failed to fetch application' }, { status: 500 })

@@ -62,6 +62,7 @@ function ApplyPageInner() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [existingApp, setExistingApp] = useState<ExistingApp | null>(null)
+  const [denialCount, setDenialCount] = useState(0)
   const [inGuild, setInGuild] = useState<boolean | null>(null)
   const [formInfo, setFormInfo] = useState<FormData | null>(null)
   const [formError, setFormError] = useState('')
@@ -153,6 +154,7 @@ function ApplyPageInner() {
       if (appData.application) {
         setExistingApp(appData.application)
       }
+      setDenialCount(appData.denialCount ?? 0)
     } catch (e) {
       console.error('Failed to fetch data:', e)
       setError('Failed to load application form')
@@ -396,25 +398,35 @@ function ApplyPageInner() {
     }
   }
 
+  // Escalating cooldown: 3 days first denial, 5 days second, 7 days third+
+  function getEscalatedCooldown(count: number): number {
+    if (count <= 1) return 3
+    if (count === 2) return 5
+    return 7
+  }
+
   // Calculate if denied user can re-apply
-  function canReapply(): { allowed: boolean; daysRemaining: number } {
+  function canReapply(): { allowed: boolean; daysRemaining: number; cooldown: number } {
     if (!existingApp || existingApp.status !== 'denied') {
-      return { allowed: false, daysRemaining: 0 }
+      return { allowed: false, daysRemaining: 0, cooldown: 0 }
     }
+
+    const cooldown = getEscalatedCooldown(denialCount)
 
     const reviewedAt = existingApp.reviewedAt ? new Date(existingApp.reviewedAt) : null
     if (!reviewedAt) {
-      return { allowed: false, daysRemaining: cooldownDays }
+      return { allowed: false, daysRemaining: cooldown, cooldown }
     }
 
     const now = new Date()
     const diffMs = now.getTime() - reviewedAt.getTime()
     const diffDays = diffMs / (1000 * 60 * 60 * 24)
-    const daysRemaining = Math.ceil(cooldownDays - diffDays)
+    const daysRemaining = Math.ceil(cooldown - diffDays)
 
     return {
-      allowed: diffDays >= cooldownDays,
+      allowed: diffDays >= cooldown,
       daysRemaining: Math.max(0, daysRemaining),
+      cooldown,
     }
   }
 

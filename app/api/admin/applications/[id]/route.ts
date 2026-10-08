@@ -43,7 +43,6 @@ export async function PUT(
 
     const serverName = process.env.NEXT_PUBLIC_SERVER_NAME || 'Our Server'
     const formName = application.form?.name || 'Whitelist'
-    const cooldownDays = application.form?.cooldownDays ?? 7
 
     // Determine which role to use
     const roleId = application.form?.roleId || (application.formId === null ? DISCORD_WHITELIST_ROLE_ID : null)
@@ -123,6 +122,16 @@ export async function PUT(
       if (roleId) {
         await removeRole(application.discordId, roleId)
       }
+
+      // Count denials (including this one) for escalating cooldown
+      const denialCount = await prisma.application.count({
+        where: {
+          discordId: application.discordId,
+          formId: application.formId,
+          status: 'denied',
+        },
+      })
+      const cooldownDays = denialCount <= 1 ? 3 : denialCount === 2 ? 5 : 7
 
       // Send denial DM
       dmSent = await sendEmbedDM(application.discordId, {
